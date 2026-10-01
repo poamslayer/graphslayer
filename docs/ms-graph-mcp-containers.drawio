@@ -1,0 +1,183 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/29.6.6 Chrome/144.0.7559.236 Electron/40.8.4 Safari/537.36" version="29.6.6">
+  <diagram id="RSPPwWXyNm3L23rg_NWR" name="Page-1">
+    <mxGraphModel dx="1220" dy="1952" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1654" pageHeight="1169" math="0" shadow="0" adaptiveColors="auto">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" parent="1" style="text;html=1;align=left;verticalAlign=middle;fontSize=18;fontColor=#333333;" value="&lt;b&gt;ms-graph-mcp — Container diagram (C4 level 2)&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size: 12px;&quot;&gt;An MCP server that reads Microsoft Graph through sandboxed scripts and writes through a separate, confirmed tool&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="900" x="60" y="-60" as="geometry" />
+        </mxCell>
+        <mxCell id="admin" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#08427B;strokeColor=#052E56;fontColor=#FFFFFF;arcSize=12;verticalAlign=top;spacingTop=8;" value="&lt;b&gt;Operator&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size: 10px&quot;&gt;[Person]&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;Adds connections and decides which tenants the agent can reach&lt;/font&gt;" vertex="1">
+          <mxGeometry height="100" width="230" x="70" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="agent" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#08427B;strokeColor=#052E56;fontColor=#FFFFFF;arcSize=12;verticalAlign=top;spacingTop=8;" value="&lt;b&gt;AI agent / MCP client&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size: 10px&quot;&gt;[Software System]&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;Claude Code or any MCP host. Writes the JavaScript that reads Graph.&lt;/font&gt;" vertex="1">
+          <mxGeometry height="100" width="300" x="440" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="boundary" parent="1" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;dashPattern=8 8;fillColor=none;strokeColor=#666666;fontColor=#666666;verticalAlign=bottom;align=left;spacingLeft=16;spacingBottom=6;arcSize=2;" value="&lt;b&gt;ms-graph-mcp&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size: 10px&quot;&gt;[Software System — one Node 22 process on the operator&#39;s machine]&lt;/font&gt;" vertex="1">
+          <mxGeometry height="805" width="1160" x="30" y="215" as="geometry" />
+        </mxCell>
+        <mxCell id="cli" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;strokeColor=#2E6295;fontColor=#FFFFFF;arcSize=12;verticalAlign=top;spacingTop=8;" value="&lt;b&gt;CLI&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size: 10px&quot;&gt;[Container: Node.js, src/cli]&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;connect, connect --app-only, connections. Prompts for the credential, so it is never a tool argument.&lt;/font&gt;" vertex="1">
+          <mxGeometry height="120" width="230" x="70" y="270" as="geometry" />
+        </mxCell>
+        <mxCell id="core" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;strokeColor=#2E6295;fontColor=#FFFFFF;arcSize=12;verticalAlign=top;spacingTop=8;" value="&lt;b&gt;MCP server core&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size: 10px&quot;&gt;[Container: TypeScript, MCP SDK over stdio]&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;Registers graph_describe, graph_run, graph_write and the connection tools. Resolves the tenant argument and caps every result.&lt;/font&gt;" vertex="1">
+          <mxGeometry height="120" width="300" x="440" y="270" as="geometry" />
+        </mxCell>
+        <mxCell id="auth" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;strokeColor=#2E6295;fontColor=#FFFFFF;arcSize=12;verticalAlign=top;spacingTop=8;" value="&lt;b&gt;Auth&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size: 10px&quot;&gt;[Container: MSAL Node]&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;Interactive sign-in and client credentials. The connection&#39;s cloud picks the authority.&lt;/font&gt;" vertex="1">
+          <mxGeometry height="120" width="250" x="900" y="270" as="geometry" />
+        </mxCell>
+        <mxCell id="indexsandbox" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;strokeColor=#2E6295;fontColor=#FFFFFF;arcSize=12;verticalAlign=top;spacingTop=8;" value="&lt;b&gt;Index sandbox&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size: 10px&quot;&gt;[Container: workerd via Miniflare]&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;Built with no service binding, so it has no network at all. ADR-0008.&lt;/font&gt;" vertex="1">
+          <mxGeometry height="140" width="230" x="70" y="480" as="geometry" />
+        </mxCell>
+        <mxCell id="sandbox" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;strokeColor=#2E6295;fontColor=#FFFFFF;arcSize=12;verticalAlign=top;spacingTop=8;" value="&lt;b&gt;Run sandbox&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size: 10px&quot;&gt;[Container: workerd via Miniflare]&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;Runs the agent&#39;s script in a fresh isolate. Its only reachable host is graph.local, behind a read-only binding. A timeout throws the runtime away.&lt;/font&gt;" vertex="1">
+          <mxGeometry height="140" width="300" x="440" y="480" as="geometry" />
+        </mxCell>
+        <mxCell id="client" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;strokeColor=#2E6295;fontColor=#FFFFFF;arcSize=12;verticalAlign=top;spacingTop=8;" value="&lt;b&gt;Graph client&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size: 10px&quot;&gt;[Container: TypeScript, fetch]&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;Paging, retry on 429, 503 and 504, the ConsistencyLevel header, and one audit line per call. The only container that talks to Graph.&lt;/font&gt;" vertex="1">
+          <mxGeometry height="130" width="300" x="440" y="700" as="geometry" />
+        </mxCell>
+        <mxCell id="gindex" parent="1" style="shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=12;whiteSpace=wrap;html=1;fillColor=#438DD5;strokeColor=#2E6295;fontColor=#FFFFFF;verticalAlign=top;spacingTop=8;" value="&lt;b&gt;Graph index&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size: 10px&quot;&gt;[Data: JSON shipped with the package]&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;Paths, properties, default selects, least-privileged scopes, and the GCC High removals.&lt;/font&gt;" vertex="1">
+          <mxGeometry height="150" width="230" x="70" y="700" as="geometry" />
+        </mxCell>
+        <mxCell id="connstore" parent="1" style="shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=12;whiteSpace=wrap;html=1;fillColor=#438DD5;strokeColor=#2E6295;fontColor=#FFFFFF;verticalAlign=top;spacingTop=8;" value="&lt;b&gt;Connection store&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size: 10px&quot;&gt;[Data: ~/.ms-graph-mcp/connections.json]&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;Alias, tenant, cloud, kind, mode, frozen scopes.&lt;/font&gt;" vertex="1">
+          <mxGeometry height="115" width="250" x="390" y="890" as="geometry" />
+        </mxCell>
+        <mxCell id="auditlog" parent="1" style="shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=12;whiteSpace=wrap;html=1;fillColor=#438DD5;strokeColor=#2E6295;fontColor=#FFFFFF;verticalAlign=top;spacingTop=8;" value="&lt;b&gt;Audit log&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size: 10px&quot;&gt;[Data: ~/.ms-graph-mcp/audit, 0700 and 0600]&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;One line per call, run, write and connection change.&lt;/font&gt;" vertex="1">
+          <mxGeometry height="115" width="240" x="690" y="890" as="geometry" />
+        </mxCell>
+        <mxCell id="tokencache" parent="1" style="shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=12;whiteSpace=wrap;html=1;fillColor=#438DD5;strokeColor=#2E6295;fontColor=#FFFFFF;verticalAlign=top;spacingTop=8;" value="&lt;b&gt;Token cache&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size: 10px&quot;&gt;[Data: msal-cache.json, OS-protected]&lt;/font&gt;" vertex="1">
+          <mxGeometry height="115" width="190" x="970" y="890" as="geometry" />
+        </mxCell>
+        <mxCell id="browser" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#999999;strokeColor=#6C6C6C;fontColor=#FFFFFF;arcSize=12;verticalAlign=top;spacingTop=8;" value="&lt;b&gt;Web browser&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size: 10px&quot;&gt;[Software System]&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;Where the operator completes a delegated sign-in.&lt;/font&gt;" vertex="1">
+          <mxGeometry height="110" width="240" x="1260" y="270" as="geometry" />
+        </mxCell>
+        <mxCell id="entra" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#999999;strokeColor=#6C6C6C;fontColor=#FFFFFF;arcSize=12;verticalAlign=top;spacingTop=8;" value="&lt;b&gt;Microsoft Entra ID&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size: 10px&quot;&gt;[Software System — sign-in authority]&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;login.microsoftonline.com, or .us for GCC High&lt;/font&gt;" vertex="1">
+          <mxGeometry height="120" width="240" x="1260" y="500" as="geometry" />
+        </mxCell>
+        <mxCell id="graph" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#999999;strokeColor=#6C6C6C;fontColor=#FFFFFF;arcSize=12;verticalAlign=top;spacingTop=8;" value="&lt;b&gt;Microsoft Graph&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size: 10px&quot;&gt;[Software System]&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;graph.microsoft.com, or graph.microsoft.us for GCC High&lt;/font&gt;" vertex="1">
+          <mxGeometry height="130" width="240" x="1260" y="700" as="geometry" />
+        </mxCell>
+        <mxCell id="keychain" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#999999;strokeColor=#6C6C6C;fontColor=#FFFFFF;arcSize=12;verticalAlign=top;spacingTop=8;" value="&lt;b&gt;OS keychain&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size: 10px&quot;&gt;[Software System — Keychain, DPAPI, Secret Service]&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;Holds each app-only client secret or certificate password.&lt;/font&gt;" vertex="1">
+          <mxGeometry height="130" width="240" x="1260" y="890" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" edge="1" parent="1" source="admin" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#666666;fontColor=#333333;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="cli" value="runs connect and connections&lt;br&gt;&lt;font style=&quot;font-size: 10px&quot;&gt;[terminal]&lt;/font&gt;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" edge="1" parent="1" source="agent" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#666666;fontColor=#333333;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="core" value="calls tools&lt;br&gt;&lt;font style=&quot;font-size: 10px&quot;&gt;[MCP JSON-RPC over stdio]&lt;/font&gt;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e3" edge="1" parent="1" source="cli" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#666666;fontColor=#333333;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.2;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="auth" value="signs in, then stores the connection">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="370" y="294" />
+              <mxPoint x="370" y="245" />
+              <mxPoint x="1025" y="245" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e4" edge="1" parent="1" source="core" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#666666;fontColor=#333333;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="sandbox" value="graph_run: runs the script">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" edge="1" parent="1" source="core" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#666666;fontColor=#333333;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0;exitY=0.75;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="indexsandbox" value="graph_describe: an index run">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="400" y="360" />
+              <mxPoint x="400" y="435" />
+              <mxPoint x="185" y="435" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e6" edge="1" parent="1" source="indexsandbox" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#666666;fontColor=#333333;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="gindex" value="loads the index as its preamble">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" edge="1" parent="1" source="sandbox" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#666666;fontColor=#333333;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="client" value="binding calls&lt;br&gt;&lt;font style=&quot;font-size: 10px&quot;&gt;[workerd service binding]&lt;/font&gt;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" edge="1" parent="1" source="core" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#666666;fontColor=#333333;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.8;exitDx=0;exitDy=0;entryX=1;entryY=0.25;entryDx=0;entryDy=0;" target="client" value="graph_write: preview, then the write&lt;br&gt;a signed confirm token names">
+          <mxGeometry relative="1" x="0.54" as="geometry">
+            <Array as="points">
+              <mxPoint x="800" y="366" />
+              <mxPoint x="800" y="732" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e9" edge="1" parent="1" source="client" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#666666;fontColor=#333333;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.55;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="auth" value="asks for a token">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="860" y="771" />
+              <mxPoint x="860" y="330" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e10" edge="1" parent="1" source="client" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#666666;fontColor=#333333;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0;exitY=0.35;exitDx=0;exitDy=0;entryX=1;entryY=0.3;entryDx=0;entryDy=0;" target="gindex" value="reads the index">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e11" edge="1" parent="1" source="core" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#666666;fontColor=#333333;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0;exitY=0.85;exitDx=0;exitDy=0;entryX=0.3;entryY=0;entryDx=0;entryDy=0;" target="connstore" value="resolves the alias">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="350" y="372" />
+              <mxPoint x="350" y="865" />
+              <mxPoint x="465" y="865" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e12" edge="1" parent="1" source="cli" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#666666;fontColor=#333333;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="connstore" value="saves and removes connections">
+          <mxGeometry relative="1" x="0.5" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="55" y="330" />
+              <mxPoint x="55" y="960" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e13" edge="1" parent="1" source="client" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#666666;fontColor=#333333;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.85;exitY=1;exitDx=0;exitDy=0;entryX=0.1;entryY=0;entryDx=0;entryDy=0;" target="auditlog" value="appends an event per call">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="695" y="860" />
+              <mxPoint x="714" y="860" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e14" edge="1" parent="1" source="auth" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#666666;fontColor=#333333;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.66;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="tokencache" value="caches tokens">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e15" edge="1" parent="1" source="auth" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#666666;fontColor=#333333;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.25;exitDx=0;exitDy=0;entryX=0;entryY=0.35;entryDx=0;entryDy=0;" target="browser" value="opens sign-in">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e16" edge="1" parent="1" source="auth" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#666666;fontColor=#333333;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.9;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="entra" value="authorization code, or a&lt;br&gt;client credential &lt;font style=&quot;font-size: 10px&quot;&gt;[HTTPS]&lt;/font&gt;">
+          <mxGeometry relative="1" x="-0.35" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="1125" y="455" />
+              <mxPoint x="1380" y="455" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e17" edge="1" parent="1" source="browser" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#666666;fontColor=#333333;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="entra" value="the operator signs in">
+          <mxGeometry relative="1" x="-0.4" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e18" edge="1" parent="1" source="auth" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#666666;fontColor=#333333;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.75;exitDx=0;exitDy=0;entryX=0;entryY=0.4;entryDx=0;entryDy=0;" target="keychain" value="reads the stored credential">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1205" y="360" />
+              <mxPoint x="1205" y="942" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e19" edge="1" parent="1" source="client" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#666666;fontColor=#333333;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.7;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="graph" value="GET for a run; POST, PATCH, PUT&lt;br&gt;or DELETE for a write &lt;font style=&quot;font-size: 10px&quot;&gt;[HTTPS]&lt;/font&gt;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1000" y="791" />
+              <mxPoint x="1000" y="765" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="legend" parent="1" style="text;html=1;align=left;verticalAlign=top;fontSize=11;fontColor=#333333;strokeColor=#CCCCCC;fillColor=none;spacing=10;" value="&lt;b&gt;Reading&lt;/b&gt; runs agent → graph_run → run sandbox → binding → Graph client → Graph. The script never holds a token and can reach no host but graph.local, and the sandbox is built without network for an index run.&lt;br&gt;&lt;b&gt;Writing&lt;/b&gt; skips the sandbox: graph_write previews the change, hands back a signed confirm token, and performs the write only for a connection whose mode is write.&lt;br&gt;&lt;b&gt;Clouds:&lt;/b&gt; each connection names its cloud, and that choice picks both the Graph endpoint and the sign-in authority. Tokens are not interchangeable between clouds." vertex="1">
+          <mxGeometry height="80" width="1470" x="30" y="1050" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

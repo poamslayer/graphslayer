@@ -1,0 +1,34 @@
+{
+  "paths": 11546,
+  "typedPaths": 6858,
+  "untypedByKind": {
+    "count": 2153,
+    "action": 2086,
+    "function": 152,
+    "media": 208,
+    "ref": 82,
+    "enum": 7
+  },
+  "unclassifiedPaths": [],
+  "types": 3034,
+  "unresolvedEntityTypes": [],
+  "consistencyPaths": 443,
+  "scopeCoverage": {
+    "paths": 11546,
+    "matched": 3486
+  },
+  "defaultSelect": {
+    "types": 9,
+    "paths": 320
+  },
+  "bytes": 4130962,
+  "peakRssBytes": 366690304,
+  "timingsMs": {
+    "readAndParse": 152.85104100000171,
+    "openapiParse": 136.3504580000008,
+    "assemble": 231.94495899999674,
+    "govRemovals": 195.7654999999977,
+    "total": 29684.788291
+  },
+  "builtAt": "2026-10-01"
+}

@@ -1,0 +1,63 @@
+{
+  "name": "graphslayer",
+  "version": "0.1.0",
+  "description": "An MCP server for Microsoft Graph, built like Cloudflare's: docs, search and execute. The model writes a short script that runs in a sandbox, so only the result it asked for comes back.",
+  "author": "Arnold De La Vega",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/poamslayer/graphslayer.git"
+  },
+  "homepage": "https://github.com/poamslayer/graphslayer#readme",
+  "bugs": {
+    "url": "https://github.com/poamslayer/graphslayer/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "microsoft-graph",
+    "microsoft-365",
+    "entra",
+    "intune",
+    "code-mode"
+  ],
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "graphslayer": "dist/cli/main.js"
+  },
+  "files": [
+    "dist",
+    "data/graph-index.json",
+    "data/graph-index.usgov.removals.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "build": "tsc -p tsconfig.json",
+    "build:index": "node --experimental-strip-types --no-warnings scripts/build-index/build.ts",
+    "rank:read-scopes": "node --experimental-strip-types --no-warnings scripts/rank-read-scopes.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.scripts.json",
+    "test": "vitest run",
+    "start": "node dist/cli/main.js",
+    "prepublishOnly": "npm run clean && npm run build && npm test"
+  },
+  "dependencies": {
+    "@azure/msal-node": "^6.0.1",
+    "@azure/msal-node-extensions": "^5.5.1",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@napi-rs/keyring": "^2.1.0",
+    "miniflare": "4.20260730.0",
+    "open": "^11.0.4",
+    "zod": "^4.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.3",
+    "fast-xml-parser": "^5.11.1",
+    "typescript": "5",
+    "vitest": "^5.0.1"
+  }
+}

@@ -1,0 +1,19 @@
+# No trailing slash: a trailing slash matches a directory only, and a symlink named
+# node_modules is not one. One got committed that way and every clone then materialized a
+# link into the committer's home directory.
+node_modules
+dist/
+.env
+*.log
+# Microsoft's published metadata, downloaded by the index build. Large and reproducible.
+.cache/
+# Only v1.0 ships. The beta index builds from the same script when a maintainer asks for it.
+data/graph-index-beta.json
+data/graph-index-beta.report.json
+data/graph-index-beta.usgov.removals.json
+# Throwaway measurement output from the prototype/graph-index branch, kept locally only.
+scripts/build-index/prototype/
+# Ranking output from scripts/rank-read-scopes.ts. Derived entirely from the committed index by
+# a committed script, so it is reproducible in a second and only adds noise to a diff. The
+# record that is meant to last is the write-up under docs/measurements/.
+data/read-scope-ranking.json
