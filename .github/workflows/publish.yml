@@ -21,5 +21,9 @@ jobs:
           node-version: '24'                     # ships npm 11, which trusted publishing needs
           registry-url: 'https://registry.npmjs.org'
           package-manager-cache: false           # no cache in a release build
+      # The keychain libraries load libsecret when imported, and prepublishOnly's tests store
+      # secrets through a Secret Service on D-Bus, which a runner does not have until one is started.
+      - run: sudo apt-get update && sudo apt-get install -y libsecret-1-0 gnome-keyring dbus-x11
       - run: npm ci
-      - run: npm publish                         # prepublishOnly cleans, builds and tests
+      # prepublishOnly cleans, builds and tests before anything is uploaded
+      - run: dbus-run-session -- sh -c 'echo "" | gnome-keyring-daemon --unlock --components=secrets >/dev/null && npm publish'

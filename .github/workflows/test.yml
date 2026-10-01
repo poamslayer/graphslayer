@@ -1,0 +1,25 @@
+# Runs the tests on Linux for every pull request, the same way the release does.
+name: Test
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      # The keychain libraries load libsecret when imported, and store secrets through a
+      # Secret Service on D-Bus, which a runner does not have until one is started.
+      - run: sudo apt-get update && sudo apt-get install -y libsecret-1-0 gnome-keyring dbus-x11
+      - run: npm ci
+      - run: dbus-run-session -- sh -c 'echo "" | gnome-keyring-daemon --unlock --components=secrets >/dev/null && npm run build && npm test'
