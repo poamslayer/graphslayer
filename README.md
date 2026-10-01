@@ -4,6 +4,9 @@
   <img src="docs/graphslayer-boss.jpg" width="400" alt="A cloaked knight with a sword walks toward a castle, where the Microsoft Graph logo glows in the sky above a boss health bar labeled Microsoft Graph">
 </p>
 
+**Works with GCC High.** You can add commercial and GCC High tenants to the same server, and each
+call names the tenant it uses. See [GCC High](#gcc-high).
+
 graphslayer is an MCP server that lets an AI agent, such as Claude, read and change a Microsoft
 365 tenant through Microsoft Graph. The agent writes a short JavaScript script, the server runs it
 in a sandbox on your machine, and only the result the script returns goes back to the agent. One
