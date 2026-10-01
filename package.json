@@ -1,7 +1,7 @@
 {
   "name": "graphslayer",
   "version": "0.1.0",
-  "description": "An MCP server for Microsoft Graph, built like Cloudflare's: docs, search and execute. The model writes a short script that runs in a sandbox, so only the result it asked for comes back.",
+  "description": "An MCP server that lets an AI agent read and change a Microsoft 365 tenant through Microsoft Graph, by writing short scripts that run in a sandbox. Tools: docs, search, execute.",
   "author": "Arnold De La Vega",
   "repository": {
     "type": "git",

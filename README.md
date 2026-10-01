@@ -1,31 +1,39 @@
 # graphslayer
 
-An MCP server for Microsoft Graph, built the way Cloudflare's MCP server is: three tools, `docs`, `search` and `execute`. The model writes a short script that runs in a sandbox against a typed Graph client, so only the result it asked for comes back. A script can write through a connection that was added read-write.
+graphslayer is an MCP server that lets an AI agent, such as Claude, read and change a Microsoft
+365 tenant through Microsoft Graph. The agent writes a short JavaScript script, the server runs it
+in a sandbox on your machine, and only the result the script returns goes back to the agent. One
+script can page through every user, join them to their groups, and return ten rows, instead of
+the agent pulling thousands of records into its context.
+
+It has three tools, plus three for managing connections:
+
+| Tool | What it does |
+|---|---|
+| `docs` | Searches the Microsoft Learn documentation and returns the matching passages with their links. |
+| `search` | Runs a script over a built-in catalogue of Microsoft Graph: every path, method, property, and the permissions each call needs. It needs no tenant. |
+| `execute` | Runs a script against one tenant. It reads, and through a connection added read-write, it also writes. |
+| `connections_list`, `connection_add`, `connection_remove` | List, add and remove the tenants the server can reach. |
 
 ## Requirements
 
-| | |
-|---|---|
-| Node.js | 22 or newer. Check with `node --version`. |
-| Disk | About 310 MB for a source install. Most of it is the `workerd` binary for your platform at 109 MB, plus the build tooling a clone needs and a published install would not. |
+- Node.js 22 or newer. Check with `node --version`.
+- macOS, Linux or Windows, on x64 or arm64.
+- About 250 MB of disk. Most of it is `workerd`, the runtime the sandbox runs in.
 
-macOS, Linux and Windows are all supported on x64 and arm64. Both native dependencies resolve a
-per-platform binary at install time, so there is nothing to compile.
-
-**Linux needs one thing the other two do not.** Sign-ins are stored through the Secret Service
-API over D-Bus. A desktop install already provides it; a minimal or headless machine does not,
-and storing a sign-in fails without it:
+On Linux, sign-ins are stored through the Secret Service. A desktop install already has it. A
+server or minimal install needs it added:
 
 ```bash
 sudo apt install gnome-keyring libsecret-1-0   # Debian, Ubuntu
 sudo dnf install gnome-keyring libsecret       # Fedora, RHEL
 ```
 
-Over SSH there is no session bus to talk to, so run the server under one: `dbus-run-session -- <command>`.
+Over SSH there is no session bus, so start the server with `dbus-run-session -- <command>`.
 
 ## Install
 
-It is on npm, so your MCP client can start it with `npx`. Add this to your client's config:
+Add this to your MCP client's config:
 
 ```json
 {
@@ -38,285 +46,210 @@ It is on npm, so your MCP client can start it with `npx`. Add this to your clien
 }
 ```
 
-Claude Code takes the same thing as one command:
+In Claude Code it is one command:
 
 ```bash
 claude mcp add graphslayer -- npx -y graphslayer
 ```
 
-Where the config file lives:
-
-| Client | Location |
+| Client | Config file |
 |---|---|
 | Claude Desktop, macOS | `~/Library/Application Support/Claude/claude_desktop_config.json` |
 | Claude Desktop, Windows | `%APPDATA%\Claude\claude_desktop_config.json` |
 | Claude Desktop, Linux | `~/.config/Claude/claude_desktop_config.json` |
 | VS Code | `.vscode/mcp.json` in the workspace |
 
-Restart the client after editing the file. The first start downloads about 170 MB, most of it the
-`workerd` runtime for your platform.
+Restart the client after you edit the file.
 
-### From source
+## Connect a tenant
 
-To work on the server itself, clone it and point your client at the build:
+A connection is one signed-in tenant. You can hold several, and every tool call names the one it
+uses. There are three kinds.
 
-```bash
-git clone https://github.com/poamslayer/graphslayer.git
-cd graphslayer
-npm install
-npm run build
-```
+### As yourself
 
-Then use `"command": "node"` with `"args": ["/absolute/path/to/graphslayer/dist/cli/main.js"]`.
-On Windows, escape the backslashes in the path. A server started from a stale `dist/` keeps running
-the old code, because Node does not reload it, so rebuild and then reconnect, in that order.
-
-## First sign-in
-
-Ask the model to add a connection, or run this in a terminal from the clone:
+Ask the agent to add a connection, or run:
 
 ```bash
 npx -y graphslayer connect --alias contoso
 ```
 
-A browser window opens. Sign in with a work account and approve the requested read permissions.
-The sign-in is cached in your operating system keychain — Keychain on macOS, Credential Manager
-on Windows, the Secret Service on Linux. Tokens and secrets never pass through the model.
+A browser window opens. Sign in with a work account and approve the permissions. The sign-in is
+stored in your operating system's keychain: Keychain on macOS, Credential Manager on Windows, and
+the Secret Service on Linux. Tokens and secrets never pass through the agent.
 
-## App-only connections
+A connection is read-only unless you add it with `--template read-write`. Only then can
+`execute` write through it.
 
-An app-only connection runs as an application rather than as a person, with the permissions an
-administrator granted your own app registration. Adding one is a terminal command and cannot be
-done from inside a chat, because no tool argument ever carries a credential.
+### As an application
+
+An app-only connection runs as your own app registration, with the application permissions an
+administrator granted it. You add it from a terminal, because the agent never handles a
+credential:
 
 ```bash
 npx -y graphslayer connect --app-only --tenant <tenant-id> --client-id <your-app-id> --mode read
 ```
 
-The command prompts for the client secret. Nothing is echoed, there is no flag for it, and it goes
-straight to your operating system keychain; the connections file records only the tenant, the
-client id and the mode. For a certificate instead of a secret, pass `--cert <path>` to a PEM
-holding the certificate and its encrypted private key, and the prompt asks for the password that
-decrypts the key.
+It asks for the client secret, or with `--cert <path>`, for the password of a PEM file holding
+the certificate and its private key. The secret goes to the keychain. `--tenant`, `--client-id`
+and `--mode` are required, and `--mode write` is what lets `execute` write.
 
-Three flags are required and have no defaults:
+### As an AI agent acting for you
 
-| Flag | Why it is required |
-|---|---|
-| `--tenant <id>` | Client credentials are issued per tenant. There is no organizations authority for this flow. |
-| `--client-id <id>` | The default Microsoft Graph Command Line Tools app is a public client and cannot hold a credential, so app-only needs your own registration. |
-| `--mode read\|write` | App-only gets no scope template, so the mode is the only thing deciding whether `execute` may write through the connection. |
+An agent connection uses an Entra Agent ID agent identity. Graph sees you as the user and the
+agent as the app, so Microsoft's sign-in log shows which calls the agent made for you. It works in
+the commercial cloud.
 
-`--template` and `--scopes` are refused with `--app-only`. The client credentials flow must
-request `.default`, so the connection takes whatever an administrator granted and a named ask
-would not change what the token carries.
-
-Removing an app-only connection with `connection_remove` clears its keychain credential as well as
-its record.
-
-## Agent connections
-
-An agent connection has an Entra Agent ID agent identity call Graph on your behalf. Graph sees
-you as the user and the agent identity as the client, so Microsoft's sign-in and activity logs
-can tell the agent's calls from your own. Commercial cloud only for now. ADR-0015 explains the token flow.
-
-Set this up in Entra first, once:
-- An agent identity blueprint with a certificate.
-- An exposed `access_agent` scope on the blueprint.
-- The delegated Graph scopes granted to the blueprint and marked inheritable.
-- An agent identity created from the blueprint.
-
-Microsoft Learn's "Create an agent identity blueprint" walks through each step. Agent identities
-can never hold `Application.ReadWrite.All`, `RoleManagement.ReadWrite.All`, `User.ReadWrite.All`
-or `Directory.AccessAsUser.All`.
+First set up the agent in Entra: an agent identity blueprint with a certificate, an
+`access_agent` scope on it, the Graph permissions granted to it and marked inheritable, and an
+agent identity made from it. Microsoft Learn's "Create an agent identity blueprint" covers each
+step. Then:
 
 ```bash
 npx -y graphslayer connect --agent --tenant <tenant-id> --blueprint-id <blueprint-app-id> \
   --agent-id <agent-app-id> --cert <path-to-blueprint.pem> --mode read --alias agent
 ```
 
-The command prompts for the password that decrypts the blueprint's private key, and that password
-goes to your operating system keychain. Then a browser window opens for you to sign in. `--tenant`,
-`--blueprint-id`, `--agent-id` and `--mode` are required. `--template` and `--scopes` are refused,
-because the agent's scopes are the ones its blueprint was granted.
+It asks for the certificate password, then opens a browser for you to sign in. Microsoft never
+lets an agent identity hold `Application.ReadWrite.All`, `RoleManagement.ReadWrite.All`,
+`User.ReadWrite.All` or `Directory.AccessAsUser.All`.
 
-Removing an agent connection clears the blueprint credential from the keychain. Your cached
-sign-in stays while another connection still uses it.
+## Scripts
 
-## National clouds
+The agent writes the body of an async function and returns what it wants back. In `execute`,
+the `graph` object makes the calls:
 
-GCC High is supported. A connection names the cloud it lives in, once, when you add it, and every
-call made through it follows — the sign-in authority, the Graph host, and the scope a client
-credential asks for. One server can hold a commercial tenant and a GCC High tenant at the same
-time.
+```js
+const policies = await graph.all("/identity/conditionalAccess/policies", { select: ["displayName", "state"] });
+return policies.filter((p) => p.state === "enabled").map((p) => p.displayName);
+```
+
+```js
+return await graph.request({ method: "PATCH", path: "/users/{id}", body: { accountEnabled: false } });
+```
+
+| Call | What it does |
+|---|---|
+| `graph.get(path)` | Reads one object. |
+| `graph.list(path)` | Reads one page, with a cursor for the next. |
+| `graph.all(path)` | Reads every page, up to 2,000 items by default. |
+| `graph.batch(requests)` | Sends up to 20 reads in one request. |
+| `graph.count(path, filter)` | Counts the items in a collection. |
+| `graph.request({ method, path, body })` | Sends any method. On a read-only connection, every method but GET is refused before anything is sent. |
+
+The server handles the Graph details a script would otherwise get wrong:
+- It sets the consistency header that advanced directory queries need.
+- It waits and retries when Graph throttles. A write is resent only on a 429, because Graph may
+  already have applied a write that came back with a 503 or 504.
+- It answers a wrong path with the closest real ones.
+- A collection read with no `select` asks for a small set of useful fields. A page of a hundred
+  groups drops from about 223 kB to about 27 kB. Pass `select: ["*"]` for every field.
+
+A script can make at most 200 Graph calls, and its output is capped at about 10,000 tokens.
+
+In `search`, the script reads the `index` object instead. This returns the least-privileged
+permission for listing Conditional Access policies:
+
+```js
+return index.paths["/identity/conditionalAccess/policies"]?.scopes?.get?.delegated;
+```
+
+### The sandbox
+
+Scripts run in a fresh V8 isolate inside `workerd`, which the server starts on your machine. The
+isolate has no file system and no network. Its only way out is a call back to the server, which
+holds the token and makes the Graph request, so the token never enters the script. The `search`
+sandbox has no network at all.
+
+## GCC High
+
+A connection names its cloud when you add it, and every call through it uses that cloud's
+sign-in and Graph endpoints. One server can hold commercial and GCC High tenants at the same time.
+
+```bash
+npx -y graphslayer connect --cloud usgov-high --alias agency
+```
 
 | Cloud | Sign-in | Graph |
 |---|---|---|
 | `commercial` (default) | `login.microsoftonline.com` | `graph.microsoft.com` |
 | `usgov-high` | `login.microsoftonline.us` | `graph.microsoft.us` |
 
-Pass it when you add the connection:
+GCC High tenants usually require a compliant device for sign-in. If the browser sign-in fails,
+check that the machine is enrolled in the tenant before you suspect the server.
 
-```bash
-npx -y graphslayer connect --cloud usgov-high --alias agency
-npx -y graphslayer connect --app-only --cloud usgov-high --tenant <tenant-id> --client-id <your-app-id> --mode read
-```
-
-From a chat, `connection_add` takes the same `cloud` argument. `execute` does
-not: it reads the cloud off the connection you name, so there is no way to point a Gov connection
-at a commercial host by mistake.
-
-Leaving `--cloud` off means commercial, which is also what a connection stored before this existed
-means. Nothing needs rewriting.
-
-**Sign-in usually requires a compliant device.** GCC High tenants commonly enforce Conditional
-Access device compliance, so the browser sign-in has to happen on a machine enrolled in that
-tenant. When it does not, sign-in fails at the policy, not in this server — it is worth ruling that
-in before reading anything else as a bug.
-
-### What `search` knows about a Gov tenant
-
-`search` takes a `cloud` argument of its own, because it answers from the shipped index
-without a connection to read one off:
-
-```
-search { code: "return Object.keys(index.paths).filter(p => p.includes('conditionalAccess'))", cloud: "usgov-high" }
-```
-
-A Gov tenant does not have every path the commercial metadata describes, so the index build
-derives a removal list from the live Gov metadata and the loader subtracts it. On `usgov-high`,
-2,739 of the 11,546 v1.0 paths are gone — entity sets, entity types, and the actions and functions
-a Gov tenant cannot invoke — so search stops offering paths that would only ever 404.
-
-Two limits are worth knowing, both from ADR-0014. Only one of the five sources the index is built
-from publishes a Gov equivalent, so **path shape is Gov-correct while least-privileged scopes are
-not**. The `search` description says so, so the model does not treat the commercial scopes as verified. The
-`ConsistencyLevel` decision is inherited from commercial for the same reason.
-
-## How scripts run
-
-Scripts run in a fresh V8 isolate inside Cloudflare's open source `workerd` runtime, which the server starts on your machine through Miniflare. The isolate has no filesystem and no network. Its only way out is a call back into this server, which holds your token and makes the Graph request. The install is about 170 MB because it includes the `workerd` binary for your platform.
-
-## Tools
-
-The server has three tools, copied from Cloudflare's MCP server (ADR-0017), plus the connection tools.
-
-- `connections_list`, `connection_add`, `connection_remove`
-- `docs`: search Microsoft Learn. It returns the most relevant passages, each with its page title
-  and link, from Microsoft's public Learn MCP server. Use it to answer how something works before
-  reading a tenant.
-- `search`: run a script over the shipped Graph index, which holds every path, method, entity
-  property, enum, and the permissions each call needs. It needs no tenant and no connection, and
-  the script runs in a sandbox with no network at all.
-
-  ```js
-  // Least-privileged delegated scope to list conditional access policies
-  return index.paths["/identity/conditionalAccess/policies"]?.scopes?.get?.delegated;
-  ```
-- `execute`: run a script against one tenant. It reads, and on a connection added read-write it
-  writes. Example the model might write:
-
-```js
-const p = await graph.all("/identity/conditionalAccess/policies", { select: ["id", "displayName", "state"] });
-return p.filter(x => x.state === "enabled").map(x => x.displayName);
-```
-
-  Writes go through `graph.request({ method, path, body })`, which returns `{ status, body }`:
-
-```js
-return await graph.request({ method: "PATCH", path: "/users/{id}", body: { accountEnabled: false } });
-```
-
-  A connection added in read mode refuses every method but GET before anything is sent. That is
-  the only limit on writes, the same way Cloudflare's only limit is the permission set chosen on
-  its consent screen. There is no preview and no confirm step. A write is resent only when Graph
-  answers 429, because a 503 or 504 may arrive after the write was applied.
-
-  Reads are shaped so a page costs what it needs to. A collection read with no `select` sends a
-  small default set of fields for the directory resources, which takes a page of a hundred groups
-  from about 223 kB to about 27 kB. Pass `select: ["*"]` for the whole object. `search` shows a
-  path's default. No page size is sent unless the script asks for one, because some collections
-  reject one outright.
-
-## Shutting down
-
-The server disposes the `workerd` runtime before exiting when your MCP client disconnects, when
-it is sent SIGINT or SIGTERM, or when the client simply closes the connection and goes away. The
-last of those is worth naming, because the MCP SDK's stdio transport does not report end of input
-on its own, so a server without that handling stays running for the rest of your session holding
-a runtime that measures over a hundred megabytes.
-
-`kill -9` is the one case nothing can cover: no handler runs, and the runtime is a separate
-process that outlives its parent. If you kill the server that way, check for a stray process:
-
-```bash
-pgrep -fl workerd
-```
-
-## Configuration
-
-| Variable | Meaning |
-|---|---|
-| `GRAPHSLAYER_HOME` | Directory for connections and the token cache. Default `~/.graphslayer`. |
-| `GRAPHSLAYER_CLIENT_ID` | Your own Entra app registration (public client). Default is the Microsoft Graph Command Line Tools app. |
-| `GRAPHSLAYER_NO_TOKEN_CACHE` | Set to `1` to keep tokens in memory only. |
+`search` takes `cloud: "usgov-high"` to use the GCC High catalogue. It leaves out the 2,739 paths
+that GCC High does not have. Its permission data is copied from commercial, because Microsoft does
+not publish a GCC High version, so treat it as a guide there.
 
 ## Where calls are recorded
 
-The server keeps no log of its own. Microsoft 365 records the calls, in the tenant, where an
-administrator already looks. ADR-0016 explains why.
+graphslayer keeps no log of its own. Microsoft 365 records its calls in the tenant:
 
 | Record | What it shows | What it needs |
 |---|---|---|
-| Entra sign-in log | Each sign-in, and for an agent connection the agent and the person | Every tenant |
+| Entra sign-in log | Each sign-in, and for an agent connection, the agent and the person | Every tenant |
 | Entra and workload audit logs | Each change: what changed, who made it, and when | Every tenant |
 | Microsoft Graph activity logs | Every Graph request, reads included | Entra ID P1 or P2, and a diagnostic setting that sends the logs to Log Analytics, Storage or Event Hubs |
 
-Every Graph request this server makes carries `User-Agent: graphslayer/<version>`. On a
-delegated connection the client id is shared with Graph PowerShell, so the User-Agent is how you
-tell the server's calls apart. In Log Analytics:
+Every request carries `User-Agent: graphslayer/<version>`, so you can find the server's calls:
 
 ```kusto
 MicrosoftGraphActivityLogs
 | where UserAgent startswith "graphslayer/"
-| project TimeGenerated, UserId, AppId, RequestMethod, RequestUri, ResponseStatusCode, Scopes
+| project TimeGenerated, UserId, AppId, RequestMethod, RequestUri, ResponseStatusCode
 ```
 
-An agent connection's calls appear in the sign-in log as non-interactive sign-ins. The default
-query hides them, so ask for them by type:
+An agent connection's calls are non-interactive sign-ins, which the sign-in log hides by default:
 
 ```
 GET /beta/auditLogs/signIns?$filter=signInEventTypes/any(t: t eq 'nonInteractiveUser') and appId eq '<agent-app-id>'
 ```
 
-A write the server refused, because the connection is in read mode, never reaches Graph, so no
-Microsoft log records it. The model sees the refusal in the tool's answer.
+## Configuration
 
-Versions before ADR-0016 wrote to `~/.graphslayer/audit/`. Nothing writes there now, and you can
-delete that folder.
+| Variable | What it does |
+|---|---|
+| `GRAPHSLAYER_HOME` | Where connections and the token cache are kept. Default `~/.graphslayer`. |
+| `GRAPHSLAYER_CLIENT_ID` | Your own public client app registration for sign-in. Default is Microsoft's Graph Command Line Tools app. |
+| `GRAPHSLAYER_NO_TOKEN_CACHE` | Set to `1` to keep tokens in memory only. |
+
+When your MCP client disconnects, the server shuts down `workerd` before it exits. If you kill the
+server with `kill -9`, check for a leftover `workerd` process with `pgrep -fl workerd`.
 
 ## Development
 
 ```bash
+git clone https://github.com/poamslayer/graphslayer.git
+cd graphslayer
 npm install
 npm test
 npm run build
 node dist/cli/main.js --help
 ```
 
+To run your build from an MCP client, use `"command": "node"` with
+`"args": ["/absolute/path/to/graphslayer/dist/cli/main.js"]`. Node does not reload changed code,
+so rebuild, then reconnect the client.
+
+The design decisions are in `docs/adr`, and the project's vocabulary is in `CONTEXT.md`.
+
 ## Release
 
-The package ships a **Graph index**, `data/graph-index.json`: an offline catalogue of Graph
-paths, entity types and their properties, and least privileged scopes, built from Microsoft's
-published metadata. Regenerate it as part of every release, before publishing:
+1. Rebuild the Graph catalogue from Microsoft's current metadata, and read the report it prints.
+   A path listed as unclassified, or a type it could not resolve, means Microsoft changed a shape,
+   so look at it before you ship. It needs python3 with PyYAML.
 
-```bash
-npm run build:index -- --refresh    # re-download Microsoft's metadata, then rebuild
-npm test                            # asserts the index is under 32 MB and loads in an isolate
-```
+   ```bash
+   npm run build:index -- --refresh
+   npm test
+   ```
 
-`--refresh` matters: without it the build reuses whatever metadata is cached, which is right
-while iterating and wrong for a release. Read the report the build prints. If it lists a path
-as unclassified, or a type name it could not resolve, Microsoft has changed a shape — that is
-a build to look at rather than a build to ship. It needs python3 with PyYAML;
-`scripts/build-index/README.md` has the prerequisites and the measured figures.
+2. Bump the version in a pull request and merge it.
+3. Create the release: `gh release create v<version> --generate-notes`. A GitHub Actions workflow
+   publishes it to npm through trusted publishing, with provenance. It needs no token.
+
+## License
+
+MIT
