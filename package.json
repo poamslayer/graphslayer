@@ -1,6 +1,6 @@
 {
   "name": "graphslayer",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "An MCP server that lets an AI agent read and change a Microsoft 365 tenant through Microsoft Graph, by writing short scripts that run in a sandbox. Tools: docs, search, execute.",
   "author": "Arnold De La Vega",
   "repository": {

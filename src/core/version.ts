@@ -1,6 +1,14 @@
+import { createRequire } from "node:module";
+
+/**
+ * Read from package.json, so bumping the version for a release is the only edit. The path is
+ * the same from src/core and from dist/core, and npm always ships package.json.
+ */
+const { version } = createRequire(import.meta.url)("../../package.json") as { version: string };
+
 /** Kept apart from server.ts so the Graph client can name the server without importing the tools. */
 export const SERVER_NAME = "graphslayer";
-export const SERVER_VERSION = "0.1.0";
+export const SERVER_VERSION = version;
 
 /**
  * Sent on every Graph request. Microsoft Graph activity logs record the User-Agent, and on a
