@@ -1,5 +1,9 @@
 # graphslayer
 
+<p align="center">
+  <img src="docs/graphslayer-boss.jpg" width="400" alt="A cloaked knight with a sword walks toward a castle, where the Microsoft Graph logo glows in the sky above a boss health bar labeled Microsoft Graph">
+</p>
+
 graphslayer is an MCP server that lets an AI agent, such as Claude, read and change a Microsoft
 365 tenant through Microsoft Graph. The agent writes a short JavaScript script, the server runs it
 in a sandbox on your machine, and only the result the script returns goes back to the agent. One
