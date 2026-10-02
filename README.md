@@ -110,8 +110,8 @@ the commercial cloud.
 
 First set up the agent in Entra: an agent identity blueprint with a certificate, an
 `access_agent` scope on it, the Graph permissions granted to it and marked inheritable, and an
-agent identity made from it. Microsoft Learn's "Create an agent identity blueprint" covers each
-step. Then:
+agent identity made from it. [docs/agent-setup.md](docs/agent-setup.md) walks through each step.
+Then:
 
 ```bash
 npx -y graphslayer connect --agent --tenant <tenant-id> --blueprint-id <blueprint-app-id> \
