@@ -17,16 +17,19 @@ export type CliArgs =
   | { command: "connect-app-only"; alias?: string; tenantId: string; clientId: string; mode: ConnectionMode; cloud?: Cloud; certPath?: string }
   | { command: "connect-agent"; alias?: string; tenantId: string; blueprintId: string; agentId: string; mode: ConnectionMode; cloud?: Cloud; certPath?: string; headless?: Headless };
 
-/** A browser sign-in on a host with no browser: print the address and wait on a fixed port. #8. */
-export interface Headless {
-  port: number;
-}
+/**
+ * A sign-in on a host with no browser: print the address and wait on a fixed port (#8), or use
+ * device code flow (#12).
+ */
+export type Headless = { kind: "redirect"; port: number } | { kind: "device-code" };
 
 /** The loopback port a headless sign-in waits on when --port is not given. */
 export const DEFAULT_HEADLESS_PORT = 8400;
 
 export const APP_ONLY_REJECTS_HEADLESS =
-  "--no-browser and --port cannot be combined with --app-only. An app-only sign-in has no browser step.";
+  "--no-browser, --port and --device-code cannot be combined with --app-only. An app-only sign-in has no browser step.";
+export const DEVICE_CODE_REJECTS_NO_BROWSER =
+  "--device-code cannot be combined with --no-browser or --port. Device code flow has no redirect to wait for.";
 
 export const APP_ONLY_NEEDS_TENANT =
   "--app-only needs --tenant <id>. Client credentials are issued per tenant, so there is no organizations authority for this flow.";
@@ -73,14 +76,16 @@ function parseConnect(rest: string[]): CliArgs {
   let template: string | undefined;
   let scopes: string[] | undefined;
   let noBrowser = false;
+  let deviceCode = false;
   let port: string | undefined;
 
   for (let i = 0; i < rest.length; i += 1) {
     const flag = rest[i];
     // The flags without a value, so the pairing has to stop for them rather than eat the next word.
-    if (flag === "--app-only" || flag === "--agent" || flag === "--no-browser") {
+    if (flag === "--app-only" || flag === "--agent" || flag === "--no-browser" || flag === "--device-code") {
       if (flag === "--app-only") appOnly = true;
       else if (flag === "--agent") agent = true;
+      else if (flag === "--device-code") deviceCode = true;
       else noBrowser = true;
       continue;
     }
@@ -106,11 +111,13 @@ function parseConnect(rest: string[]): CliArgs {
   }
 
   let headless: Headless | undefined;
+  if (deviceCode && (noBrowser || port !== undefined)) throw new Error(DEVICE_CODE_REJECTS_NO_BROWSER);
   if (port !== undefined && !noBrowser) throw new Error("--port is only used with --no-browser.");
+  if (deviceCode) headless = { kind: "device-code" };
   if (noBrowser) {
     const n = port === undefined ? DEFAULT_HEADLESS_PORT : Number(port);
     if (!Number.isInteger(n) || n < 1024 || n > 65535) throw new Error(`--port must be a whole number from 1024 to 65535, not "${port}".`);
-    headless = { port: n };
+    headless = { kind: "redirect", port: n };
   }
 
   if (agent) {
@@ -204,6 +211,9 @@ export async function connectAppOnly(
  * which differs from --port only when that one was taken.
  */
 export function headlessBrowser(headless: Headless, stderr: NodeJS.WritableStream = process.stderr): BrowserSignIn {
+  if (headless.kind === "device-code") {
+    return { deviceCode: (message) => stderr.write(`${message}\n\nWaiting for the sign-in...\n`) };
+  }
   return {
     port: headless.port,
     openBrowser: async (url) => {
@@ -266,6 +276,8 @@ const HELP = `graphslayer
       --no-browser             Print the sign-in address instead of opening a browser, for a host
                                reached over SSH. The redirect comes back on a fixed port.
       --port <n>               Port the redirect comes back on with --no-browser (default: 8400)
+      --device-code            Sign in with a code at microsoft.com/devicelogin instead. Blocked
+                               where security defaults or Conditional Access block device code.
   graphslayer connect --app-only
                                Sign in as an application and store the connection. Prompts for the
                                client secret, or for the certificate password with --cert.
@@ -284,7 +296,8 @@ const HELP = `graphslayer
       --cert <path>            PEM holding the blueprint certificate and its encrypted private key
       --mode read|write        Whether this connection may write (required)
       --alias <name>           Short name for the connection
-      --no-browser, --port <n> As for a delegated connect
+      --no-browser, --port <n>, --device-code
+                               As for a delegated connect
   graphslayer connections     List stored connections
 `;
 

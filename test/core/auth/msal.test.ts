@@ -90,6 +90,22 @@ describe("MsalAuthImpl", () => {
     expect(pca.acquireTokenInteractive.mock.calls[0][0]).toMatchObject({ openBrowser: printer, preferredPort: 8400 });
   });
 
+  it("signs in by device code when asked, handing MSAL's message on and never opening a browser (#12)", async () => {
+    const pca = { ...fakePca(), acquireTokenByDeviceCode: vi.fn(async (req: { scopes: string[]; deviceCodeCallback: (r: { message: string }) => void }) => {
+      req.deviceCodeCallback({ message: "enter the code ABC123" });
+      return { accessToken: accessToken(req.scopes), account: { homeAccountId: "home-1", username: "admin@contoso.com", tenantId: "00000000-0000-0000-0000-000000000001" }, scopes: req.scopes };
+    }) };
+    const messages: string[] = [];
+    const auth = new MsalAuthImpl({ clientId: "cid", pcaFactory: () => pca as never, openBrowser: async () => {}, lookupTenantName: async () => "Contoso" });
+
+    const { connection } = await auth.signInDelegated({ alias: "contoso", browser: { deviceCode: (m) => messages.push(m) } });
+
+    expect(pca.acquireTokenByDeviceCode.mock.calls[0][0]).toMatchObject({ scopes: READ_TEMPLATE_SCOPES });
+    expect(pca.acquireTokenInteractive).not.toHaveBeenCalled();
+    expect(messages).toEqual(["enter the code ABC123"]);
+    expect(connection.username).toBe("admin@contoso.com");
+  });
+
   it("leaves the port to MSAL when no browser option is given (#8)", async () => {
     const pca = fakePca();
     const auth = new MsalAuthImpl({ clientId: "cid", pcaFactory: () => pca as never, openBrowser: async () => {}, lookupTenantName: async () => "Contoso" });

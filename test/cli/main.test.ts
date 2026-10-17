@@ -45,13 +45,13 @@ describe("parseArgs", () => {
 
 describe("headless sign-in (#8)", () => {
   it("parses --no-browser with the default port", () => {
-    expect(parseArgs(["connect", "--no-browser", "--alias", "contoso"])).toEqual({ command: "connect", alias: "contoso", headless: { port: 8400 } });
+    expect(parseArgs(["connect", "--no-browser", "--alias", "contoso"])).toEqual({ command: "connect", alias: "contoso", headless: { kind: "redirect", port: 8400 } });
   });
   it("parses --port after --no-browser, in either order", () => {
-    expect(parseArgs(["connect", "--port", "9001", "--no-browser"])).toMatchObject({ headless: { port: 9001 } });
+    expect(parseArgs(["connect", "--port", "9001", "--no-browser"])).toMatchObject({ headless: { kind: "redirect", port: 9001 } });
   });
   it("passes headless through on an agent connect", () => {
-    expect(parseArgs(["connect", "--agent", "--tenant", "t", "--blueprint-id", "b", "--agent-id", "a", "--mode", "read", "--no-browser"])).toMatchObject({ command: "connect-agent", headless: { port: 8400 } });
+    expect(parseArgs(["connect", "--agent", "--tenant", "t", "--blueprint-id", "b", "--agent-id", "a", "--mode", "read", "--no-browser"])).toMatchObject({ command: "connect-agent", headless: { kind: "redirect", port: 8400 } });
   });
   it("rejects --port without --no-browser, a bad port, and headless with --app-only", () => {
     expect(() => parseArgs(["connect", "--port", "9001"])).toThrow("--port is only used with --no-browser.");
@@ -62,7 +62,7 @@ describe("headless sign-in (#8)", () => {
   it("prints the address and how the redirect gets back, naming the port MSAL actually got", async () => {
     const out: string[] = [];
     const stderr = new Writable({ write(c, _e, done) { out.push(c.toString()); done(); } });
-    const browser = headlessBrowser({ port: 8400 }, stderr);
+    const browser = headlessBrowser({ kind: "redirect", port: 8400 }, stderr);
     const url = "https://login.microsoftonline.com/organizations/oauth2/v2.0/authorize?client_id=x&redirect_uri=http%3A%2F%2Flocalhost%3A8401";
 
     await browser.openBrowser!(url);
@@ -72,6 +72,28 @@ describe("headless sign-in (#8)", () => {
     expect(text).toContain(url);
     expect(text).toContain("ssh -L 8401:localhost:8401");
     expect(text).toContain("curl '<address>'");
+  });
+});
+
+describe("device code sign-in (#12)", () => {
+  it("parses --device-code on a delegated and an agent connect", () => {
+    expect(parseArgs(["connect", "--device-code", "--tenant", "contoso.com"])).toEqual({ command: "connect", tenantHint: "contoso.com", headless: { kind: "device-code" } });
+    expect(parseArgs(["connect", "--agent", "--tenant", "t", "--blueprint-id", "b", "--agent-id", "a", "--mode", "read", "--device-code"])).toMatchObject({ headless: { kind: "device-code" } });
+  });
+  it("rejects --device-code with --no-browser, --port or --app-only", () => {
+    expect(() => parseArgs(["connect", "--device-code", "--no-browser"])).toThrow(/no redirect/);
+    expect(() => parseArgs(["connect", "--device-code", "--port", "9001"])).toThrow(/no redirect/);
+    expect(() => parseArgs(["connect", "--app-only", "--tenant", "t", "--client-id", "c", "--mode", "read", "--device-code"])).toThrow(/no browser step/);
+  });
+  it("prints MSAL's message with the code", () => {
+    const out: string[] = [];
+    const stderr = new Writable({ write(c, _e, done) { out.push(c.toString()); done(); } });
+    const browser = headlessBrowser({ kind: "device-code" }, stderr);
+
+    browser.deviceCode!("To sign in, use a web browser to open the page https://microsoft.com/devicelogin and enter the code ABC123 to authenticate.");
+
+    expect(out.join("")).toContain("enter the code ABC123");
+    expect(browser.openBrowser).toBeUndefined();
   });
 });
 
