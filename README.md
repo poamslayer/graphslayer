@@ -88,6 +88,22 @@ the Secret Service on Linux. Tokens and secrets never pass through the agent.
 A connection is read-only unless you add it with `--template read-write`. Only then can
 `execute` write through it.
 
+On a machine with no browser, such as a server you reach over SSH, add `--no-browser`:
+
+```bash
+npx -y graphslayer connect --alias contoso --no-browser
+```
+
+It prints the sign-in address instead of opening a browser. Open it on any machine and sign in.
+The sign-in then redirects to `http://localhost:8400` on the server, which you can reach two ways:
+
+- Forward the port before you sign in: `ssh -L 8400:localhost:8400 <server>`.
+- Or let the redirect fail. Your browser lands on a localhost page it cannot load. Copy that
+  address and run `curl '<address>'` in a second terminal on the server.
+
+`--port <n>` picks another port. `--no-browser` works with `--agent` too. It is still the browser
+sign-in, not device code flow, which Microsoft recommends blocking.
+
 ### As an application
 
 An app-only connection runs as your own app registration, with the application permissions an
