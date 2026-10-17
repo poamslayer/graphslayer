@@ -38,6 +38,11 @@ sudo dnf install gnome-keyring libsecret       # Fedora, RHEL
 
 Over SSH there is no session bus, so start the server with `dbus-run-session -- <command>`.
 
+A headless host often has no unlocked keyring at all. There, set `GRAPHSLAYER_SECRET_STORE=file`
+for both the `connect` command and the server. Sign-ins and credentials then go to files in
+`~/.graphslayer` that only you can read (mode 0600), not encrypted, as Azure CLI does on Linux.
+`docs/adr/0019-tokens-may-live-in-owner-only-files-on-request.md` explains the trade-off.
+
 ## Install
 
 Add this to your MCP client's config:

@@ -18,6 +18,15 @@ describe("cloudEndpoints", () => {
 });
 
 describe("resolveConfig", () => {
+  it("keeps secrets in the keychain unless GRAPHSLAYER_SECRET_STORE=file (#10)", () => {
+    expect(resolveConfig({ HOME: "/h" }).secretStore).toBe("keychain");
+    const cfg = resolveConfig({ HOME: "/h", GRAPHSLAYER_SECRET_STORE: "file" });
+    expect(cfg.secretStore).toBe("file");
+    expect(cfg.secretsFile).toBe("/h/.graphslayer/secrets.json");
+  });
+  it("refuses an unknown secret store instead of defaulting (#10)", () => {
+    expect(() => resolveConfig({ HOME: "/h", GRAPHSLAYER_SECRET_STORE: "plain" })).toThrow(/keychain or file/);
+  });
   it("uses the home directory by default", () => {
     const cfg = resolveConfig({ HOME: "/Users/test" });
     expect(cfg.homeDir).toBe("/Users/test/.graphslayer");
