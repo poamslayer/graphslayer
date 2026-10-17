@@ -38,9 +38,20 @@ export interface Config {
   msalCacheFile: string;
   clientId: string;
   tokenCacheEnabled: boolean;
+  /** Where tokens and credentials are kept: the OS keychain, or files only the owner can read. ADR-0019. */
+  secretStore: SecretStoreKind;
+  secretsFile: string;
 }
 
+export type SecretStoreKind = "keychain" | "file";
+
 export function resolveConfig(env: NodeJS.ProcessEnv = process.env): Config {
+  const secretStore = env.GRAPHSLAYER_SECRET_STORE ?? "keychain";
+  // An unknown value is refused rather than read as the default, because a typo would otherwise
+  // put tokens in the keychain someone meant to avoid, or fail on a host that has none.
+  if (secretStore !== "keychain" && secretStore !== "file") {
+    throw new Error(`GRAPHSLAYER_SECRET_STORE must be keychain or file, not "${secretStore}".`);
+  }
   const home = env.HOME ?? env.USERPROFILE ?? process.cwd();
   const homeDir = env.GRAPHSLAYER_HOME ?? path.join(home, ".graphslayer");
   return {
@@ -49,5 +60,7 @@ export function resolveConfig(env: NodeJS.ProcessEnv = process.env): Config {
     msalCacheFile: path.join(homeDir, "msal-cache.json"),
     clientId: env.GRAPHSLAYER_CLIENT_ID ?? DEFAULT_CLIENT_ID,
     tokenCacheEnabled: env.GRAPHSLAYER_NO_TOKEN_CACHE !== "1",
+    secretStore,
+    secretsFile: path.join(homeDir, "secrets.json"),
   };
 }

@@ -4,6 +4,7 @@ import { resolveConfig } from "../../core/config.js";
 import { ConnectionStore } from "../../core/connections/store.js";
 import { GraphClient } from "../../core/graph/client.js";
 import { createIndexLoader } from "../../core/index/loader.js";
+import { FileSecretStore } from "../../core/secrets/file.js";
 import { KeyringSecretStore } from "../../core/secrets/keychain.js";
 import { createServer } from "../../core/server.js";
 import { MiniflareSandbox } from "./miniflare-sandbox.js";
@@ -13,7 +14,7 @@ export async function buildDeps() {
   const store = new ConnectionStore(config.connectionsFile);
   // One store for the whole process. The auth layer reads an app-only credential back out of it
   // on every token request, and the connection tools clear the entry when a connection goes.
-  const secrets = new KeyringSecretStore();
+  const secrets = config.secretStore === "file" ? new FileSecretStore(config.secretsFile) : new KeyringSecretStore();
   const auth = new MsalAuthImpl({
     clientId: config.clientId,
     pcaFactory: await makeRealPcaFactory(config),

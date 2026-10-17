@@ -1,7 +1,7 @@
 import { createPrivateKey, X509Certificate } from "node:crypto";
 import { promises as fs } from "node:fs";
 import { ConfidentialClientApplication, PublicClientApplication, type Configuration } from "@azure/msal-node";
-import { DataProtectionScope, PersistenceCachePlugin, PersistenceCreator } from "@azure/msal-node-extensions";
+import { DataProtectionScope, FilePersistence, PersistenceCachePlugin, PersistenceCreator } from "@azure/msal-node-extensions";
 import open from "open";
 import { cloudEndpoints, type Cloud, type Config } from "../config.js";
 import { cloudOf } from "../connections/store.js";
@@ -546,7 +546,9 @@ async function defaultLookupTenantName(accessToken: string, graphOrigin: string)
 export async function makeRealPcaFactory(config: Config): Promise<(authority: string) => Promise<PcaLike>> {
   let cachePlugin: PersistenceCachePlugin | undefined;
   if (config.tokenCacheEnabled) {
-    const persistence = await PersistenceCreator.createPersistence({
+    // The file store writes the cache as plain JSON, mode 0600 in a 0700 directory, and never
+    // touches the keychain or D-Bus. ADR-0019.
+    const persistence = config.secretStore === "file" ? await FilePersistence.create(config.msalCacheFile) : await PersistenceCreator.createPersistence({
       cachePath: config.msalCacheFile,
       dataProtectionScope: DataProtectionScope.CurrentUser,
       serviceName: "graphslayer",
