@@ -106,8 +106,17 @@ The sign-in then redirects to `http://localhost:8400` on the server, which you c
 - Or let the redirect fail. Your browser lands on a localhost page it cannot load. Copy that
   address and run `curl '<address>'` in a second terminal on the server.
 
-`--port <n>` picks another port. `--no-browser` works with `--agent` too. It is still the browser
-sign-in, not device code flow, which Microsoft recommends blocking.
+`--port <n>` picks another port. `--no-browser` works with `--agent` too.
+
+Or use device code flow, as `az login --use-device-code` does:
+
+```bash
+npx -y graphslayer connect --alias contoso --device-code
+```
+
+It prints a code. Enter it at `https://microsoft.com/devicelogin` on any device and sign in. It
+fails in a tenant where security defaults or a Conditional Access policy block device code, and
+`--no-browser` still works there.
 
 ### As an application
 

@@ -21,7 +21,15 @@ export interface BrowserSignIn {
   openBrowser?: (url: string) => Promise<void>;
   /** The loopback port the redirect lands on, so it can be forwarded over SSH. MSAL falls back to a random one if it is taken. */
   port?: number;
+  /**
+   * Signs in with device code flow instead of a browser redirect, handing MSAL's message (the
+   * code and where to enter it) to this callback. Security defaults and Conditional Access can
+   * block the flow, so it is only used when asked for (#12).
+   */
+  deviceCode?: (message: string) => void;
 }
+
+type PersonToken = { accessToken: string; account: { homeAccountId: string; username: string; tenantId: string } | null; scopes: string[] };
 
 export interface AppOnlySignInInput {
   tenantId: string;
@@ -66,7 +74,8 @@ export interface PcaLike {
     successTemplate?: string;
     errorTemplate?: string;
     preferredPort?: number;
-  }): Promise<{ accessToken: string; account: { homeAccountId: string; username: string; tenantId: string } | null; scopes: string[] }>;
+  }): Promise<PersonToken>;
+  acquireTokenByDeviceCode(req: { scopes: string[]; deviceCodeCallback: (response: { message: string }) => void }): Promise<PersonToken | null>;
   acquireTokenSilent(req: { scopes: string[]; account: { homeAccountId: string }; forceRefresh?: boolean }): Promise<{ accessToken: string }>;
   getTokenCache(): {
     getAllAccounts(): Promise<Array<{ homeAccountId: string; username: string; tenantId: string }>>;
@@ -146,11 +155,21 @@ export class MsalAuthImpl implements MsalAuth {
     return this.secrets;
   }
 
-  private browserRequest(browser: BrowserSignIn | undefined): { openBrowser: (url: string) => Promise<void>; preferredPort?: number } {
-    return {
+  /** The one place a person signs in: device code when asked for, otherwise the browser redirect. */
+  private async signInPerson(pca: PcaLike, scopes: string[], browser: BrowserSignIn | undefined, errorHint: string): Promise<PersonToken> {
+    if (browser?.deviceCode) {
+      const onCode = browser.deviceCode;
+      const result = await pca.acquireTokenByDeviceCode({ scopes, deviceCodeCallback: (response) => onCode(response.message) });
+      if (!result) throw new Error("Device code sign-in returned no token");
+      return result;
+    }
+    return pca.acquireTokenInteractive({
+      scopes,
       openBrowser: browser?.openBrowser ?? this.openBrowser,
       ...(browser?.port !== undefined ? { preferredPort: browser.port } : {}),
-    };
+      successTemplate: "<h1>Signed in. You can close this window.</h1>",
+      errorTemplate: `<h1>Sign-in failed.</h1><p>${errorHint}</p>`,
+    });
   }
 
   private async pca(tenant: string, cloud: Cloud): Promise<PcaLike> {
@@ -169,12 +188,7 @@ export class MsalAuthImpl implements MsalAuth {
     const cloud = cloudOf(input);
     const endpoints = cloudEndpoints(cloud);
     const pca = await this.pca(input.tenantHint ?? "organizations", cloud);
-    const result = await pca.acquireTokenInteractive({
-      scopes,
-      ...this.browserRequest(input.browser),
-      successTemplate: "<h1>Signed in. You can close this window.</h1>",
-      errorTemplate: "<h1>Sign-in failed.</h1><p>Return to your MCP client for details.</p>",
-    });
+    const result = await this.signInPerson(pca, scopes, input.browser, "Return to your MCP client for details.");
     if (!result.account) throw new Error("Sign-in returned no account");
     const tenantName = await this.lookupTenantName(result.accessToken, endpoints.graphOrigin).catch(() => undefined);
     const alias = input.alias ?? slug(tenantName ?? result.account.tenantId);
@@ -254,12 +268,7 @@ export class MsalAuthImpl implements MsalAuth {
     await exchangeToken(blueprint.cca, input.blueprintId, input.agentId);
 
     const pca = await this.pca(input.tenantId, cloud);
-    const person = await pca.acquireTokenInteractive({
-      scopes: [agentAccessScope(input.blueprintId)],
-      ...this.browserRequest(input.browser),
-      successTemplate: "<h1>Signed in. You can close this window.</h1>",
-      errorTemplate: "<h1>Sign-in failed.</h1><p>Return to your terminal for details.</p>",
-    });
+    const person = await this.signInPerson(pca, [agentAccessScope(input.blueprintId)], input.browser, "Return to your terminal for details.");
     if (!person.account) throw new Error("Sign-in returned no account");
 
     const agent = await this.ccaFactory({
