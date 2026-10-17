@@ -15,6 +15,14 @@ export interface SignInResult {
   connection: Connection;
 }
 
+/** How a browser sign-in reaches the person. Both default to opening a local browser on a random port. */
+export interface BrowserSignIn {
+  /** Replaces opening a local browser, e.g. to print the address on a headless host. */
+  openBrowser?: (url: string) => Promise<void>;
+  /** The loopback port the redirect lands on, so it can be forwarded over SSH. MSAL falls back to a random one if it is taken. */
+  port?: number;
+}
+
 export interface AppOnlySignInInput {
   tenantId: string;
   clientId: string;
@@ -40,10 +48,11 @@ export interface AgentSignInInput {
   credential: string;
   certPath?: string;
   alias?: string;
+  browser?: BrowserSignIn;
 }
 
 export interface MsalAuth extends TokenProvider {
-  signInDelegated(input: { alias?: string; tenantHint?: string; cloud?: Cloud; scopes?: string[]; template?: ScopeTemplate }): Promise<SignInResult>;
+  signInDelegated(input: { alias?: string; tenantHint?: string; cloud?: Cloud; scopes?: string[]; template?: ScopeTemplate; browser?: BrowserSignIn }): Promise<SignInResult>;
   signInAppOnly(input: AppOnlySignInInput): Promise<SignInResult>;
   signInAgent(input: AgentSignInInput): Promise<SignInResult>;
   removeAccount(connection: Connection): Promise<void>;
@@ -56,6 +65,7 @@ export interface PcaLike {
     openBrowser: (url: string) => Promise<void>;
     successTemplate?: string;
     errorTemplate?: string;
+    preferredPort?: number;
   }): Promise<{ accessToken: string; account: { homeAccountId: string; username: string; tenantId: string } | null; scopes: string[] }>;
   acquireTokenSilent(req: { scopes: string[]; account: { homeAccountId: string }; forceRefresh?: boolean }): Promise<{ accessToken: string }>;
   getTokenCache(): {
@@ -136,6 +146,13 @@ export class MsalAuthImpl implements MsalAuth {
     return this.secrets;
   }
 
+  private browserRequest(browser: BrowserSignIn | undefined): { openBrowser: (url: string) => Promise<void>; preferredPort?: number } {
+    return {
+      openBrowser: browser?.openBrowser ?? this.openBrowser,
+      ...(browser?.port !== undefined ? { preferredPort: browser.port } : {}),
+    };
+  }
+
   private async pca(tenant: string, cloud: Cloud): Promise<PcaLike> {
     const authority = `${cloudEndpoints(cloud).authorityBase}/${tenant}`;
     let p = this.pcas.get(authority);
@@ -146,7 +163,7 @@ export class MsalAuthImpl implements MsalAuth {
     return p;
   }
 
-  async signInDelegated(input: { alias?: string; tenantHint?: string; cloud?: Cloud; scopes?: string[]; template?: ScopeTemplate }): Promise<SignInResult> {
+  async signInDelegated(input: { alias?: string; tenantHint?: string; cloud?: Cloud; scopes?: string[]; template?: ScopeTemplate; browser?: BrowserSignIn }): Promise<SignInResult> {
     const template = input.template ?? "read";
     const scopes = input.scopes?.length ? input.scopes : scopesForTemplate(template);
     const cloud = cloudOf(input);
@@ -154,7 +171,7 @@ export class MsalAuthImpl implements MsalAuth {
     const pca = await this.pca(input.tenantHint ?? "organizations", cloud);
     const result = await pca.acquireTokenInteractive({
       scopes,
-      openBrowser: this.openBrowser,
+      ...this.browserRequest(input.browser),
       successTemplate: "<h1>Signed in. You can close this window.</h1>",
       errorTemplate: "<h1>Sign-in failed.</h1><p>Return to your MCP client for details.</p>",
     });
@@ -239,7 +256,7 @@ export class MsalAuthImpl implements MsalAuth {
     const pca = await this.pca(input.tenantId, cloud);
     const person = await pca.acquireTokenInteractive({
       scopes: [agentAccessScope(input.blueprintId)],
-      openBrowser: this.openBrowser,
+      ...this.browserRequest(input.browser),
       successTemplate: "<h1>Signed in. You can close this window.</h1>",
       errorTemplate: "<h1>Sign-in failed.</h1><p>Return to your terminal for details.</p>",
     });

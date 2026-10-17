@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import type { MsalAuth } from "../core/auth/msal.js";
+import type { BrowserSignIn, MsalAuth } from "../core/auth/msal.js";
 import { inheritedScopesReport, SCOPE_NAME_RE, type ScopeTemplate } from "../core/auth/scopes.js";
 import type { Cloud } from "../core/config.js";
 import { cloudOf, modeOf, type ConnectionStore } from "../core/connections/store.js";
@@ -13,9 +13,20 @@ export type CliArgs =
   | { command: "serve" }
   | { command: "help" }
   | { command: "connections" }
-  | { command: "connect"; alias?: string; tenantHint?: string; cloud?: Cloud; scopes?: string[]; template?: ScopeTemplate }
+  | { command: "connect"; alias?: string; tenantHint?: string; cloud?: Cloud; scopes?: string[]; template?: ScopeTemplate; headless?: Headless }
   | { command: "connect-app-only"; alias?: string; tenantId: string; clientId: string; mode: ConnectionMode; cloud?: Cloud; certPath?: string }
-  | { command: "connect-agent"; alias?: string; tenantId: string; blueprintId: string; agentId: string; mode: ConnectionMode; cloud?: Cloud; certPath?: string };
+  | { command: "connect-agent"; alias?: string; tenantId: string; blueprintId: string; agentId: string; mode: ConnectionMode; cloud?: Cloud; certPath?: string; headless?: Headless };
+
+/** A browser sign-in on a host with no browser: print the address and wait on a fixed port. #8. */
+export interface Headless {
+  port: number;
+}
+
+/** The loopback port a headless sign-in waits on when --port is not given. */
+export const DEFAULT_HEADLESS_PORT = 8400;
+
+export const APP_ONLY_REJECTS_HEADLESS =
+  "--no-browser and --port cannot be combined with --app-only. An app-only sign-in has no browser step.";
 
 export const APP_ONLY_NEEDS_TENANT =
   "--app-only needs --tenant <id>. Client credentials are issued per tenant, so there is no organizations authority for this flow.";
@@ -61,13 +72,16 @@ function parseConnect(rest: string[]): CliArgs {
   let certPath: string | undefined;
   let template: string | undefined;
   let scopes: string[] | undefined;
+  let noBrowser = false;
+  let port: string | undefined;
 
   for (let i = 0; i < rest.length; i += 1) {
     const flag = rest[i];
-    // The only flag without a value, so the pairing has to stop for it rather than eat the next word.
-    if (flag === "--app-only" || flag === "--agent") {
+    // The flags without a value, so the pairing has to stop for them rather than eat the next word.
+    if (flag === "--app-only" || flag === "--agent" || flag === "--no-browser") {
       if (flag === "--app-only") appOnly = true;
-      else agent = true;
+      else if (flag === "--agent") agent = true;
+      else noBrowser = true;
       continue;
     }
     i += 1;
@@ -82,12 +96,21 @@ function parseConnect(rest: string[]): CliArgs {
     else if (flag === "--blueprint-id") blueprintId = value;
     else if (flag === "--agent-id") agentId = value;
     else if (flag === "--template") template = value;
+    else if (flag === "--port") port = value;
     else if (flag === "--scopes") scopes = value.split(",").map((s) => s.trim()).filter(Boolean);
     else throw new Error(`Unknown option ${flag}`);
   }
 
   if (cloud !== undefined && cloud !== "commercial" && cloud !== "usgov-high") {
     throw new Error(`Unknown cloud "${cloud}". Expected commercial or usgov-high.`);
+  }
+
+  let headless: Headless | undefined;
+  if (port !== undefined && !noBrowser) throw new Error("--port is only used with --no-browser.");
+  if (noBrowser) {
+    const n = port === undefined ? DEFAULT_HEADLESS_PORT : Number(port);
+    if (!Number.isInteger(n) || n < 1024 || n > 65535) throw new Error(`--port must be a whole number from 1024 to 65535, not "${port}".`);
+    headless = { port: n };
   }
 
   if (agent) {
@@ -99,6 +122,7 @@ function parseConnect(rest: string[]): CliArgs {
     if (mode !== "read" && mode !== "write") throw new Error(`Unknown mode "${mode}". Expected read or write.`);
     const out: Extract<CliArgs, { command: "connect-agent" }> = { command: "connect-agent", tenantId: tenant, blueprintId, agentId, mode };
     if (certPath !== undefined) out.certPath = certPath;
+    if (headless !== undefined) out.headless = headless;
     if (alias !== undefined) out.alias = alias;
     if (cloud !== undefined) out.cloud = cloud;
     return out;
@@ -109,6 +133,7 @@ function parseConnect(rest: string[]): CliArgs {
   // Validated after the loop, not inside it, so a flag that cannot go with --app-only is rejected
   // whichever order the two were typed in.
   if (appOnly) {
+    if (headless !== undefined) throw new Error(APP_ONLY_REJECTS_HEADLESS);
     if (template !== undefined) throw new Error(APP_ONLY_REJECTS_TEMPLATE);
     if (scopes !== undefined) throw new Error(APP_ONLY_REJECTS_SCOPES);
     if (tenant === undefined) throw new Error(APP_ONLY_NEEDS_TENANT);
@@ -132,6 +157,7 @@ function parseConnect(rest: string[]): CliArgs {
   if (tenant !== undefined) out.tenantHint = tenant;
   if (cloud !== undefined) out.cloud = cloud;
   if (template !== undefined) out.template = template as ScopeTemplate;
+  if (headless !== undefined) out.headless = headless;
   if (scopes !== undefined) {
     // The same check connection_add makes. A URL form or .default would be stored as requested
     // while the token names short scopes, and every scope would then read as inherited. #66.
@@ -172,6 +198,29 @@ export async function connectAppOnly(
   stdout.write(`Connected "${connection.alias}" (${connection.tenantName ?? connection.tenantId}) as app ${connection.clientId}, mode ${modeOf(connection)}\n`);
 }
 
+/**
+ * Prints the sign-in address instead of opening a browser, and says how the redirect gets back.
+ * MSAL is already listening when it calls this, and the port in the address is the one it got,
+ * which differs from --port only when that one was taken.
+ */
+export function headlessBrowser(headless: Headless, stderr: NodeJS.WritableStream = process.stderr): BrowserSignIn {
+  return {
+    port: headless.port,
+    openBrowser: async (url) => {
+      const redirect = new URL(url).searchParams.get("redirect_uri") ?? `http://localhost:${headless.port}`;
+      const port = new URL(redirect).port || String(headless.port);
+      stderr.write(
+        `Open this address in a browser on any machine and sign in:\n\n  ${url}\n\n` +
+          `The sign-in finishes at ${redirect} on this machine. Either:\n` +
+          `  - forward the port before you sign in: ssh -L ${port}:localhost:${port} <this host>\n` +
+          `  - or, when the browser lands on a localhost page it cannot load, copy that address and run\n` +
+          `    curl '<address>' in another terminal on this machine.\n\n` +
+          `Waiting for the sign-in...\n`,
+      );
+    },
+  };
+}
+
 export interface AgentConnectDeps {
   auth: Pick<MsalAuth, "signInAgent">;
   store: Pick<ConnectionStore, "upsert">;
@@ -197,6 +246,7 @@ export async function connectAgent(
     credential,
     certPath: args.certPath,
     alias: args.alias,
+    ...(args.headless ? { browser: headlessBrowser(args.headless, io.output) } : {}),
   });
   await deps.store.upsert(connection);
   stdout.write(`Connected "${connection.alias}" (${connection.tenantName ?? connection.tenantId}) as agent ${connection.agentId} for ${connection.username}, mode ${modeOf(connection)}\n`);
@@ -213,6 +263,9 @@ const HELP = `graphslayer
       --template read|read-write
                                Scope template to request (default: read)
       --scopes a,b,c           Delegated Graph permissions to request (overrides template scopes)
+      --no-browser             Print the sign-in address instead of opening a browser, for a host
+                               reached over SSH. The redirect comes back on a fixed port.
+      --port <n>               Port the redirect comes back on with --no-browser (default: 8400)
   graphslayer connect --app-only
                                Sign in as an application and store the connection. Prompts for the
                                client secret, or for the certificate password with --cert.
@@ -231,6 +284,7 @@ const HELP = `graphslayer
       --cert <path>            PEM holding the blueprint certificate and its encrypted private key
       --mode read|write        Whether this connection may write (required)
       --alias <name>           Short name for the connection
+      --no-browser, --port <n> As for a delegated connect
   graphslayer connections     List stored connections
 `;
 
@@ -256,7 +310,7 @@ async function main(argv: string[]): Promise<void> {
     await connectAgent(deps, args);
     return;
   }
-  const { connection } = await deps.auth.signInDelegated({ alias: args.alias, tenantHint: args.tenantHint, cloud: args.cloud, scopes: args.scopes, template: args.template });
+  const { connection } = await deps.auth.signInDelegated({ alias: args.alias, tenantHint: args.tenantHint, cloud: args.cloud, scopes: args.scopes, template: args.template, ...(args.headless ? { browser: headlessBrowser(args.headless) } : {}) });
   await deps.store.upsert(connection);
   process.stdout.write(`Connected "${connection.alias}" (${connection.tenantName ?? connection.tenantId}) as ${connection.username}, mode ${modeOf(connection)}\n`);
   const note = inheritedScopesReport(connection)?.inheritedScopesNote;

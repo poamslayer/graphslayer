@@ -79,6 +79,26 @@ describe("scopesFromAccessToken", () => {
 });
 
 describe("MsalAuthImpl", () => {
+  it("hands a headless opener and fixed port to the interactive sign-in instead of the default browser (#8)", async () => {
+    const pca = fakePca();
+    const defaultOpener = vi.fn(async () => {});
+    const auth = new MsalAuthImpl({ clientId: "cid", pcaFactory: () => pca as never, openBrowser: defaultOpener, lookupTenantName: async () => "Contoso" });
+    const printer = async () => {};
+
+    await auth.signInDelegated({ alias: "contoso", browser: { openBrowser: printer, port: 8400 } });
+
+    expect(pca.acquireTokenInteractive.mock.calls[0][0]).toMatchObject({ openBrowser: printer, preferredPort: 8400 });
+  });
+
+  it("leaves the port to MSAL when no browser option is given (#8)", async () => {
+    const pca = fakePca();
+    const auth = new MsalAuthImpl({ clientId: "cid", pcaFactory: () => pca as never, openBrowser: async () => {}, lookupTenantName: async () => "Contoso" });
+
+    await auth.signInDelegated({ alias: "contoso" });
+
+    expect(pca.acquireTokenInteractive.mock.calls[0][0]).not.toHaveProperty("preferredPort");
+  });
+
   it("uses the read template by default and returns a read connection", async () => {
     const pca = fakePca();
     const auth = new MsalAuthImpl({ clientId: "cid", pcaFactory: () => pca as never, openBrowser: async () => {}, lookupTenantName: async () => "Contoso" });

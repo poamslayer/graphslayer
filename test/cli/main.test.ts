@@ -13,6 +13,7 @@ import {
   AGENT_REJECTS_APP_ONLY,
   connectAgent,
   connectAppOnly,
+  headlessBrowser,
   isEntryPoint,
   parseArgs,
 } from "../../src/cli/main.js";
@@ -39,6 +40,38 @@ describe("parseArgs", () => {
   });
   it("rejects unknown commands", () => {
     expect(() => parseArgs(["frobnicate"])).toThrow(/Unknown command/);
+  });
+});
+
+describe("headless sign-in (#8)", () => {
+  it("parses --no-browser with the default port", () => {
+    expect(parseArgs(["connect", "--no-browser", "--alias", "contoso"])).toEqual({ command: "connect", alias: "contoso", headless: { port: 8400 } });
+  });
+  it("parses --port after --no-browser, in either order", () => {
+    expect(parseArgs(["connect", "--port", "9001", "--no-browser"])).toMatchObject({ headless: { port: 9001 } });
+  });
+  it("passes headless through on an agent connect", () => {
+    expect(parseArgs(["connect", "--agent", "--tenant", "t", "--blueprint-id", "b", "--agent-id", "a", "--mode", "read", "--no-browser"])).toMatchObject({ command: "connect-agent", headless: { port: 8400 } });
+  });
+  it("rejects --port without --no-browser, a bad port, and headless with --app-only", () => {
+    expect(() => parseArgs(["connect", "--port", "9001"])).toThrow("--port is only used with --no-browser.");
+    expect(() => parseArgs(["connect", "--no-browser", "--port", "80"])).toThrow(/1024 to 65535/);
+    expect(() => parseArgs(["connect", "--no-browser", "--port", "abc"])).toThrow(/1024 to 65535/);
+    expect(() => parseArgs(["connect", "--app-only", "--tenant", "t", "--client-id", "c", "--mode", "read", "--no-browser"])).toThrow(/no browser step/);
+  });
+  it("prints the address and how the redirect gets back, naming the port MSAL actually got", async () => {
+    const out: string[] = [];
+    const stderr = new Writable({ write(c, _e, done) { out.push(c.toString()); done(); } });
+    const browser = headlessBrowser({ port: 8400 }, stderr);
+    const url = "https://login.microsoftonline.com/organizations/oauth2/v2.0/authorize?client_id=x&redirect_uri=http%3A%2F%2Flocalhost%3A8401";
+
+    await browser.openBrowser!(url);
+
+    expect(browser.port).toBe(8400);
+    const text = out.join("");
+    expect(text).toContain(url);
+    expect(text).toContain("ssh -L 8401:localhost:8401");
+    expect(text).toContain("curl '<address>'");
   });
 });
 
