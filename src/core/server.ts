@@ -3,10 +3,8 @@ import type { ConnectionStore } from "./connections/store.js";
 import type { GraphClient } from "./graph/client.js";
 import type { MsalAuth } from "./auth/msal.js";
 import type { IndexSandboxFactory, Sandbox } from "./sandbox/sandbox.js";
-import type { SecretStore } from "./secrets/keychain.js";
 import { createIndexLoader } from "./index/loader.js";
 import type { LoadedIndex } from "./index/loader.js";
-import { registerConnectionTools } from "./tools/connections.js";
 import { registerSearchTool } from "./tools/search.js";
 import { registerDocsTool, type DocsDeps } from "./tools/docs.js";
 import { registerExecuteTool } from "./tools/execute.js";
@@ -16,8 +14,6 @@ export interface ServerDeps extends DocsDeps {
   store: ConnectionStore;
   client: GraphClient;
   auth: MsalAuth;
-  /** The OS keychain, so removing an app-only connection clears its credential too. */
-  secrets: Pick<SecretStore, "delete">;
   sandbox: Pick<Sandbox, "run">;
   /** Builds the no-network sandbox an index run executes in. ADR-0008. */
   indexSandbox: IndexSandboxFactory;
@@ -37,6 +33,7 @@ export function createServer(deps: ServerDeps): McpServer {
   // disappear during a session. A read connection still gets execute; it refuses writes itself.
   registerExecuteTool(server, deps);
   registerDocsTool(server, deps);
-  registerConnectionTools(server, deps);
+  // No connection tools. A person adds and removes tenants with `graphslayer connect` and
+  // `graphslayer disconnect` in a terminal, so the agent can never sign in or sign out. ADR-0020.
   return server;
 }

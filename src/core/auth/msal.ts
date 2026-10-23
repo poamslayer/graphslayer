@@ -342,13 +342,13 @@ export class MsalAuthImpl implements MsalAuth {
     const pca = await this.pca(connection.tenantId, cloudOf(connection));
     const accounts = await pca.getTokenCache().getAllAccounts();
     const account = accounts.find((a) => a.homeAccountId === connection.homeAccountId);
-    if (!account) throw new Error(`No cached sign-in for "${connection.alias}". Run connection_add to sign in again.`);
+    if (!account) throw new Error(`No cached sign-in for "${connection.alias}". Ask the person to run "graphslayer connect --alias ${connection.alias}" to sign in again.`);
     const scopes = graphScopesForConnection(connection.scopes, endpoints.graphScopeDefault);
     try {
       const res = await pca.acquireTokenSilent(forceRefresh ? { scopes, account, forceRefresh } : { scopes, account });
       return res.accessToken;
     } catch (err) {
-      throw new Error(`Token refresh failed for "${connection.alias}". Run connection_add to sign in again. (${(err as Error).message})`);
+      throw new Error(`Token refresh failed for "${connection.alias}". Ask the person to run "graphslayer connect --alias ${connection.alias}" to sign in again. (${(err as Error).message})`);
     }
   }
 

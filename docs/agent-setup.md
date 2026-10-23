@@ -286,8 +286,8 @@ in step 5 is Entra's limit. A write needs both.
 
 ## 9. Check it
 
-Ask your agent to run `connections_list`. The `agent` connection's `scopes` should be the scopes
-you granted in step 5, plus `openid`, `profile` and `email`.
+Run `npx -y graphslayer connections`. The last column of the `agent` row lists its scopes, which
+should be the scopes you granted in step 5, plus `openid`, `profile` and `email`.
 
 The agent's calls appear in the Entra sign-in log as non-interactive sign-ins, with you as the
 user and the agent identity as the app. The default sign-in log view hides them. See
@@ -297,7 +297,7 @@ user and the agent identity as the app. The default sign-in log view hides them.
 
 | Symptom | Cause |
 |---|---|
-| A scope you granted is missing from `connections_list` | The blueprint does not mark Graph as inheritable, which is step 6. Or the grant is on the agent identity instead of the blueprint principal. If both are right, add the scope to the blueprint's `requiredResourceAccess`. |
+| A scope you granted is missing from `graphslayer connections` | The blueprint does not mark Graph as inheritable, which is step 6. Or the grant is on the agent identity instead of the blueprint principal. If both are right, add the scope to the blueprint's `requiredResourceAccess`. |
 | `AADSTS82014` | Something asked for consent on the agent identity. Grant on the blueprint principal instead. |
 | `AADSTS7000215` or a certificate error | The blueprint does not have the certificate in `--cert`, or the password was wrong. Run `connect` again. |
 | graphslayer refuses the connection for the cloud | Agent connections work in the commercial cloud only. |

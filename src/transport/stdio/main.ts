@@ -13,14 +13,14 @@ export async function buildDeps() {
   const config = resolveConfig();
   const store = new ConnectionStore(config.connectionsFile);
   // One store for the whole process. The auth layer reads an app-only credential back out of it
-  // on every token request, and the connection tools clear the entry when a connection goes.
+  // on every token request, and `graphslayer disconnect` clears the entry when a connection goes.
   const secrets = config.secretStore === "file" ? new FileSecretStore(config.secretsFile) : new KeyringSecretStore();
   const auth = new MsalAuthImpl({
     clientId: config.clientId,
     pcaFactory: await makeRealPcaFactory(config),
     secrets,
     // A refreshed token that carries scopes granted outside the server updates the record, so
-    // connections_list matches the token and the next silent request names the new scopes (#73).
+    // `graphslayer connections` matches the token and the next silent request names the new scopes (#73).
     onScopesChanged: (connection, scopes) => store.upsert({ ...connection, scopes }),
   });
   // One loader for the whole server. The Graph client reads the index to decide the consistency

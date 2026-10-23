@@ -176,7 +176,7 @@ describe("graph.request: writes from inside a run (#78)", () => {
   });
 
   it.each([
-    { kind: "delegated" as const, hint: "read-write template" },
+    { kind: "delegated" as const, hint: "--template read-write" },
     { kind: "app" as const, hint: "connect --app-only --mode write" },
     { kind: "agent" as const, hint: "connect --agent --mode write" },
   ])("refuses a write on a read $kind connection and sends nothing", async ({ kind, hint }) => {

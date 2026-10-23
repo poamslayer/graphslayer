@@ -14,6 +14,8 @@ So the scope template is what we *ask* for and can never be what we *enforce*. T
 - **A write cannot be restricted to particular objects.** A connection that may change groups may change every group in that tenant, because no Graph scope is resource-scoped. This is the capability we traded away, and rules can be added later if a real case appears.
 - **App-only connections get no template.** The client credentials flow must request `.default`, so an app-only connection takes whatever permissions an administrator granted the registration. Mode is the only control on that path.
 - `policy_show` is dropped from the tool surface. `connections_list` already returns each connection's granted scopes, which answers the same question.
+
+> Updated by ADR-0020 (2026-10-23): `connections_list` is gone too. `graphslayer connections` prints the granted scopes.
 - ADR-0005 stands. The confirm token is now the only step between the model choosing a write and the write happening, which raises its value rather than lowering it.
 
 > Updated by ADR-0017 (2026-10-01): the write tool is gone, and `execute` writes. This mode check is now the only limit on a write, and it runs inside the binding before anything is sent.

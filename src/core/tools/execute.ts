@@ -1,16 +1,16 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { GraphClient } from "../graph/client.js";
-import type { ConnectionStore } from "../connections/store.js";
+import { cloudOf, modeOf, type ConnectionStore } from "../connections/store.js";
 import { BINDING_TYPES } from "../sandbox/binding-types.js";
 import { makeBinding } from "../sandbox/binding.js";
 import type { RunResult, Sandbox } from "../sandbox/sandbox.js";
-import type { GraphCallRecord } from "../types.js";
+import type { Connection, GraphCallRecord } from "../types.js";
 import { DEFAULT_MAX_CHARS, capJson, shedToFit } from "./output.js";
 
 export const EXECUTE_DESCRIPTION = `Run a JavaScript script against Microsoft Graph for one tenant. Use this for any read, filter, join, count, or change. Write the body of an async function and "return" the value you want back. Only what you return (and console.log) comes back to you, so filter and select inside the script. Output is capped at about 10,000 tokens.
 
-Rules the server applies for you: v1.0 by default (pass beta: true per call), ConsistencyLevel and $count for advanced directory queries, Retry-After on throttling, and a path Graph cannot find answered with the closest paths the index holds. Paths are Graph-relative like "/users" or "/identity/conditionalAccess/policies", and you pass your own select. Use connections_list to find tenant aliases, and search to find a path, the properties an entity has, and the scopes a call needs, rather than guessing. graph.request writes; a connection added in read mode refuses every method but GET.
+Rules the server applies for you: v1.0 by default (pass beta: true per call), ConsistencyLevel and $count for advanced directory queries, Retry-After on throttling, and a path Graph cannot find answered with the closest paths the index holds. Paths are Graph-relative like "/users" or "/identity/conditionalAccess/policies", and you pass your own select. Use search to find a path, the properties an entity has, and the scopes a call needs, rather than guessing. graph.request writes; a connection added in read mode refuses every method but GET.
 
 Available in the script:
 ${BINDING_TYPES}
@@ -31,7 +31,7 @@ return page.items;
 return await graph.request({ method: "PATCH", path: "/users/{id}", body: { accountEnabled: false } });`;
 
 export interface ExecuteDeps {
-  store: Pick<ConnectionStore, "resolve">;
+  store: Pick<ConnectionStore, "resolve" | "list">;
   client: GraphClient;
   sandbox: Pick<Sandbox, "run">;
 }
@@ -104,6 +104,18 @@ export function shapeRunOutput(
   );
 }
 
+/**
+ * The agent has no tool that lists connections (ADR-0020), so this error is how it finds the right
+ * one. It names each alias with its cloud and mode, and never a token, scope or user name.
+ */
+export function unknownTenantMessage(tenant: string, connections: Connection[]): string {
+  if (!connections.length) {
+    return `No connection named "${tenant}", and none are set up. Ask the person to run \`graphslayer connect --alias <name>\` in a terminal.`;
+  }
+  const rows = connections.map((c) => `- ${c.alias} (${c.tenantName ?? c.tenantId}, ${cloudOf(c)}, ${modeOf(c)})`);
+  return `No connection named "${tenant}". The connections are:\n${rows.join("\n")}\nPass one of these aliases as tenant. Only the person can add one, with \`graphslayer connect\` in a terminal.`;
+}
+
 export function registerExecuteTool(server: McpServer, deps: ExecuteDeps): void {
   server.registerTool(
     "execute",
@@ -111,7 +123,7 @@ export function registerExecuteTool(server: McpServer, deps: ExecuteDeps): void 
       title: "Run a Graph script",
       description: EXECUTE_DESCRIPTION,
       inputSchema: {
-        tenant: z.string().describe("Connection alias or tenant id. See connections_list."),
+        tenant: z.string().describe("Connection alias or tenant id. If you do not know it, call with any value and the error lists the connections there are."),
         code: z.string().describe("Body of an async JavaScript function. Use await graph.* and return a value."),
       },
       outputSchema,
@@ -120,10 +132,7 @@ export function registerExecuteTool(server: McpServer, deps: ExecuteDeps): void 
     async ({ tenant, code }) => {
       const connection = await deps.store.resolve(tenant);
       if (!connection) {
-        return {
-          isError: true,
-          content: [{ type: "text", text: `No connection named "${tenant}". Call connections_list to see aliases, or connection_add to sign in.` }],
-        };
+        return { isError: true, content: [{ type: "text", text: unknownTenantMessage(tenant, await deps.store.list()) }] };
       }
       const { handle, calls } = makeBinding({ client: deps.client, connection });
       const run = await deps.sandbox.run(code, handle);
