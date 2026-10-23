@@ -29,3 +29,5 @@ Entra issues it in three hops, measured live on 2026-09-30 against the POAMslaye
 > Superseded in part by ADR-0016 (2026-10-01): the server keeps no local audit log, so where this record mentions audit lines, Microsoft's own logs are the record now.
 
 > Superseded in part by ADR-0017 (2026-10-01): a person no longer confirms each write, and `graph_write` is now `execute`.
+
+> Updated by ADR-0020 (2026-10-23): `connection_remove` is now the `graphslayer disconnect` command, with the same rule.

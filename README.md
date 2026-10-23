@@ -13,14 +13,17 @@ in a sandbox on your machine, and only the result the script returns goes back t
 script can page through every user, join them to their groups, and return ten rows, instead of
 the agent pulling thousands of records into its context.
 
-It has three tools, plus three for managing connections:
+It has three tools:
 
 | Tool | What it does |
 |---|---|
 | `docs` | Searches the Microsoft Learn documentation and returns the matching passages with their links. |
 | `search` | Runs a script over a built-in catalogue of Microsoft Graph: every path, method, property, and the permissions each call needs. It needs no tenant. |
 | `execute` | Runs a script against one tenant. It reads, and through a connection added read-write, it also writes. |
-| `connections_list`, `connection_add`, `connection_remove` | List, add and remove the tenants the server can reach. |
+
+The agent cannot add, list or remove tenants. You do that in a terminal with `graphslayer connect`,
+`graphslayer connections` and `graphslayer disconnect <alias>`. If the agent names a tenant that
+does not exist, `execute` answers with the list of connections, so it can pick the right one.
 
 ## Requirements
 
@@ -80,7 +83,7 @@ uses. There are three kinds.
 
 ### As yourself
 
-Ask the agent to add a connection, or run:
+Run:
 
 ```bash
 npx -y graphslayer connect --alias contoso

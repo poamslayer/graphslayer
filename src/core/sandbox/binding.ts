@@ -131,5 +131,5 @@ function requestArg(v: unknown): RequestArg {
 export function writableHint(connection: Connection): string {
   if (connection.kind === "agent") return "An agent connection that may write is added with `graphslayer connect --agent --mode write`.";
   if (connection.kind === "app") return "An app-only connection that may write is added with `graphslayer connect --app-only --mode write`.";
-  return "A connection that may write is added with connection_add and the read-write template.";
+  return "A connection that may write is added with `graphslayer connect --template read-write`.";
 }

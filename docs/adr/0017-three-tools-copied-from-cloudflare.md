@@ -30,3 +30,5 @@ The Graph client now resends a write only on 429. A 503 or 504 on a POST can arr
 - **Nothing previews a write before it happens.** The model sees what Graph answered, after the fact. The record of the change is the workload's audit log (ADR-0016).
 - **Clients cannot gate writes by tool name.** `execute` carries `destructiveHint: true` for every call, including reads, because MCP annotations are per tool and not per call. A client that prompts on destructive tools now prompts for reads too.
 - **`search` lost its keyword mode** and the curated answer it gave: ranked matches, enum values, and a note where Microsoft's permission reference is silent. The same facts are in the index, and the description shows how to get them with a script. On GCC High, the description says the scopes are commercial and unverified (ADR-0014), which the query mode used to say per result.
+
+> Updated by ADR-0020 (2026-10-23): the connection tools are gone, so `docs`, `search` and `execute` are the only tools.

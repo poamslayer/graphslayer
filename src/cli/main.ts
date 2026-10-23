@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import type { BrowserSignIn, MsalAuth } from "../core/auth/msal.js";
 import { inheritedScopesReport, SCOPE_NAME_RE, type ScopeTemplate } from "../core/auth/scopes.js";
 import type { Cloud } from "../core/config.js";
+import { removeConnection } from "../core/connections/remove.js";
 import { cloudOf, modeOf, type ConnectionStore } from "../core/connections/store.js";
 import type { ConnectionMode } from "../core/types.js";
 import { buildDeps, startStdioServer } from "../transport/stdio/main.js";
@@ -13,6 +14,7 @@ export type CliArgs =
   | { command: "serve" }
   | { command: "help" }
   | { command: "connections" }
+  | { command: "disconnect"; alias: string }
   | { command: "connect"; alias?: string; tenantHint?: string; cloud?: Cloud; scopes?: string[]; template?: ScopeTemplate; headless?: Headless }
   | { command: "connect-app-only"; alias?: string; tenantId: string; clientId: string; mode: ConnectionMode; cloud?: Cloud; certPath?: string }
   | { command: "connect-agent"; alias?: string; tenantId: string; blueprintId: string; agentId: string; mode: ConnectionMode; cloud?: Cloud; certPath?: string; headless?: Headless };
@@ -58,6 +60,10 @@ export function parseArgs(argv: string[]): CliArgs {
   if (!cmd) return { command: "serve" };
   if (cmd === "--help" || cmd === "-h" || cmd === "help") return { command: "help" };
   if (cmd === "connections") return { command: "connections" };
+  if (cmd === "disconnect") {
+    if (rest.length !== 1 || rest[0].startsWith("-")) throw new Error("disconnect takes one connection alias or tenant id: graphslayer disconnect <alias>");
+    return { command: "disconnect", alias: rest[0] };
+  }
   if (cmd === "connect") return parseConnect(rest);
   throw new Error(`Unknown command "${cmd}". Run with --help.`);
 }
@@ -166,7 +172,7 @@ function parseConnect(rest: string[]): CliArgs {
   if (template !== undefined) out.template = template as ScopeTemplate;
   if (headless !== undefined) out.headless = headless;
   if (scopes !== undefined) {
-    // The same check connection_add makes. A URL form or .default would be stored as requested
+    // A URL form or .default would be stored as requested
     // while the token names short scopes, and every scope would then read as inherited. #66.
     const bad = scopes.filter((s) => !SCOPE_NAME_RE.test(s));
     if (bad.length) throw new Error(`These do not look like Graph permission names: ${bad.join(", ")}`);
@@ -298,7 +304,9 @@ const HELP = `graphslayer
       --alias <name>           Short name for the connection
       --no-browser, --port <n>, --device-code
                                As for a delegated connect
-  graphslayer connections     List stored connections
+  graphslayer connections     List stored connections: alias, tenant, cloud, kind, mode, user, scopes
+  graphslayer disconnect <alias>
+                               Remove a connection, its cached sign-in and its stored credential
 `;
 
 async function main(argv: string[]): Promise<void> {
@@ -311,8 +319,13 @@ async function main(argv: string[]): Promise<void> {
   const deps = await buildDeps();
   if (args.command === "connections") {
     for (const c of await deps.store.list()) {
-      process.stdout.write(`${c.alias}\t${c.tenantId}\t${c.tenantName ?? ""}\t${cloudOf(c)}\t${c.kind}\t${modeOf(c)}\t${c.username ?? ""}\n`);
+      process.stdout.write(`${c.alias}\t${c.tenantId}\t${c.tenantName ?? ""}\t${cloudOf(c)}\t${c.kind}\t${modeOf(c)}\t${c.username ?? ""}\t${c.scopes.join(" ")}\n`);
     }
+    return;
+  }
+  if (args.command === "disconnect") {
+    if (!(await removeConnection(deps, args.alias))) throw new Error(`No connection named "${args.alias}". Run graphslayer connections to see them.`);
+    process.stdout.write(`Removed "${args.alias}"\n`);
     return;
   }
   if (args.command === "connect-app-only") {

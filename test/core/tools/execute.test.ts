@@ -154,7 +154,10 @@ describe("execute", () => {
     const mcp = await connect(deps());
     const res = await mcp.callTool({ name: "execute", arguments: { tenant: "nope", code: "return 1;" } });
     expect(res.isError).toBe(true);
-    expect(JSON.stringify(res.content)).toContain("connections_list");
+    const text = (res.content as Array<{ text: string }>)[0].text;
+    expect(text).toContain('No connection named "nope"');
+    expect(text).toContain("- contoso (");
+    expect(text).not.toContain("connections_list");
   });
 
   it("returns ok false with the script error and logs when the script throws", async () => {

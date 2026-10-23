@@ -126,7 +126,7 @@ describe.skipIf(!built)("the published bin over stdio", () => {
     const names = ((response.result as { tools: Array<{ name: string }> }).tools).map((t) => t.name).sort();
 
     expect(names).toEqual([
-      "connection_add", "connection_remove", "connections_list", "docs", "execute", "search",
+      "docs", "execute", "search",
     ]);
   }, 30_000);
 
