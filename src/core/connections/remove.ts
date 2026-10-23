@@ -41,3 +41,21 @@ export async function removeConnection(deps: RemoveConnectionDeps, alias: string
   }
   return deps.store.remove(existing.alias);
 }
+
+/**
+ * Keeps only the sign-in just stored. An install is signed in to one tenant, so connecting again
+ * replaces the old sign-in instead of adding a second. The new one is stored first, so a cached
+ * account the two share is kept. ADR-0021.
+ */
+export async function keepOnlySignIn(deps: RemoveConnectionDeps, alias: string): Promise<string[]> {
+  const others = (await deps.store.list()).filter((c) => c.alias !== alias);
+  for (const c of others) await removeConnection(deps, c.alias);
+  return others.map((c) => c.alias);
+}
+
+/** Removes every sign-in this install holds. Returns the aliases removed. */
+export async function removeAllSignIns(deps: RemoveConnectionDeps): Promise<string[]> {
+  const all = await deps.store.list();
+  for (const c of all) await removeConnection(deps, c.alias);
+  return all.map((c) => c.alias);
+}

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { removeConnection } from "../../../src/core/connections/remove.js";
+import { keepOnlySignIn, removeAllSignIns, removeConnection } from "../../../src/core/connections/remove.js";
 import { appOnlySecretAccount, MemorySecretStore } from "../../../src/core/secrets/keychain.js";
 import type { Connection } from "../../../src/core/types.js";
 
@@ -120,5 +120,29 @@ describe("removeConnection", () => {
 
     await removeConnection(d, "contoso");
     expect(d.auth.removeAccount).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("one sign-in per install (ADR-0021)", () => {
+  it("keeps only the new sign-in and clears the old one's credential", async () => {
+    const d = deps([appConn, conn]);
+    await d.secrets.set(appOnlySecretAccount(appConn.tenantId, appConn.clientId), "s3cret");
+
+    expect(await keepOnlySignIn(d, "contoso")).toEqual(["contoso-app"]);
+    expect((await d.store.list()).map((c) => c.alias)).toEqual(["contoso"]);
+    expect(await d.secrets.get(appOnlySecretAccount(appConn.tenantId, appConn.clientId))).toBeUndefined();
+  });
+
+  it("keeps a cached account the old and new sign-ins share", async () => {
+    const d = deps([agentConn, { ...conn, homeAccountId: "home-1" }]);
+    await keepOnlySignIn(d, "contoso");
+    expect(d.auth.removeAccount).not.toHaveBeenCalled();
+  });
+
+  it("removes every sign-in on disconnect", async () => {
+    const d = deps([conn, appConn]);
+    expect(await removeAllSignIns(d)).toEqual(["contoso", "contoso-app"]);
+    expect(await d.store.list()).toEqual([]);
+    expect(await removeAllSignIns(d)).toEqual([]);
   });
 });
