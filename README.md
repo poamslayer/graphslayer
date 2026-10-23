@@ -4,8 +4,8 @@
   <img src="docs/graphslayer-boss.jpg" width="400" alt="A cloaked knight with a sword walks toward a castle, where the Microsoft Graph logo glows in the sky above a boss health bar labeled Microsoft Graph">
 </p>
 
-**Works with GCC High.** You can add commercial and GCC High tenants to the same server, and each
-call names the tenant it uses. See [GCC High](#gcc-high).
+**Works with GCC High.** Each install signs in to one tenant, commercial or GCC High. For a second
+tenant, add graphslayer a second time. See [More than one tenant](#more-than-one-tenant).
 
 graphslayer is an MCP server that lets an AI agent, such as Claude, read and change a Microsoft
 365 tenant through Microsoft Graph. The agent writes a short JavaScript script, the server runs it
@@ -21,9 +21,9 @@ It has three tools:
 | `search` | Runs a script over a built-in catalogue of Microsoft Graph: every path, method, property, and the permissions each call needs. It needs no tenant. |
 | `execute` | Runs a script against one tenant. It reads, and through a connection added read-write, it also writes. |
 
-The agent cannot add, list or remove tenants. You do that in a terminal with `graphslayer connect`,
-`graphslayer connections` and `graphslayer disconnect <alias>`. If the agent names a tenant that
-does not exist, `execute` answers with the list of connections, so it can pick the right one.
+Like Cloudflare's MCP server, an install is signed in to one tenant, and `execute` always uses
+it. The agent cannot sign in or out. You do that in a terminal with `graphslayer connect` and
+`graphslayer disconnect`, and `graphslayer connections` shows the sign-in.
 
 ## Requirements
 
@@ -78,15 +78,15 @@ Restart the client after you edit the file.
 
 ## Connect a tenant
 
-A connection is one signed-in tenant. You can hold several, and every tool call names the one it
-uses. There are three kinds.
+graphslayer signs in to one tenant. Running `connect` again replaces that sign-in, and
+`graphslayer disconnect` signs out. There are three ways to sign in.
 
 ### As yourself
 
 Run:
 
 ```bash
-npx -y graphslayer connect --alias contoso
+npx -y graphslayer connect
 ```
 
 A browser window opens. Sign in with a work account and approve the permissions. The sign-in is
@@ -99,7 +99,7 @@ A connection is read-only unless you add it with `--template read-write`. Only t
 On a machine with no browser, such as a server you reach over SSH, add `--no-browser`:
 
 ```bash
-npx -y graphslayer connect --alias contoso --no-browser
+npx -y graphslayer connect --no-browser
 ```
 
 It prints the sign-in address instead of opening a browser. Open it on any machine and sign in.
@@ -114,7 +114,7 @@ The sign-in then redirects to `http://localhost:8400` on the server, which you c
 Or use device code flow, as `az login --use-device-code` does:
 
 ```bash
-npx -y graphslayer connect --alias contoso --device-code
+npx -y graphslayer connect --device-code
 ```
 
 It prints a code. Enter it at `https://microsoft.com/devicelogin` on any device and sign in. It
@@ -204,11 +204,10 @@ sandbox has no network at all.
 
 ## GCC High
 
-A connection names its cloud when you add it, and every call through it uses that cloud's
-sign-in and Graph endpoints. One server can hold commercial and GCC High tenants at the same time.
+Sign in with `--cloud usgov-high`, and every call uses GCC High's sign-in and Graph endpoints.
 
 ```bash
-npx -y graphslayer connect --cloud usgov-high --alias agency
+npx -y graphslayer connect --cloud usgov-high
 ```
 
 | Cloud | Sign-in | Graph |
@@ -222,6 +221,22 @@ check that the machine is enrolled in the tenant before you suspect the server.
 `search` takes `cloud: "usgov-high"` to use the GCC High catalogue. It leaves out the 2,739 paths
 that GCC High does not have. Its permission data is copied from commercial, because Microsoft does
 not publish a GCC High version, so treat it as a guide there.
+
+## More than one tenant
+
+Add graphslayer once per tenant, each with its own folder, as you would add Cloudflare's server
+once per login. In Claude Code:
+
+```bash
+claude mcp add graphslayer-contoso -e GRAPHSLAYER_HOME=$HOME/.graphslayer-contoso -- npx -y graphslayer
+GRAPHSLAYER_HOME=$HOME/.graphslayer-contoso npx -y graphslayer connect
+
+claude mcp add graphslayer-agency -e GRAPHSLAYER_HOME=$HOME/.graphslayer-agency -- npx -y graphslayer
+GRAPHSLAYER_HOME=$HOME/.graphslayer-agency npx -y graphslayer connect --cloud usgov-high
+```
+
+The agent then sees two sets of tools, one per tenant, and the tool's name says which tenant it
+acts on.
 
 ## Where calls are recorded
 
@@ -251,7 +266,7 @@ GET /beta/auditLogs/signIns?$filter=signInEventTypes/any(t: t eq 'nonInteractive
 
 | Variable | What it does |
 |---|---|
-| `GRAPHSLAYER_HOME` | Where connections and the token cache are kept. Default `~/.graphslayer`. |
+| `GRAPHSLAYER_HOME` | Where the sign-in and the token cache are kept. Default `~/.graphslayer`. Give each install its own. |
 | `GRAPHSLAYER_CLIENT_ID` | Your own public client app registration for sign-in. Default is Microsoft's Graph Command Line Tools app. |
 | `GRAPHSLAYER_NO_TOKEN_CACHE` | Set to `1` to keep tokens in memory only. |
 

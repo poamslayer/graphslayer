@@ -39,11 +39,9 @@ describe("parseArgs", () => {
     expect(parseArgs(["--help"])).toEqual({ command: "help" });
   });
 
-  it("parses disconnect with exactly one alias", () => {
-    expect(parseArgs(["disconnect", "contoso"])).toEqual({ command: "disconnect", alias: "contoso" });
-    expect(() => parseArgs(["disconnect"])).toThrow(/one connection alias/);
-    expect(() => parseArgs(["disconnect", "a", "b"])).toThrow(/one connection alias/);
-    expect(() => parseArgs(["disconnect", "--alias"])).toThrow(/one connection alias/);
+  it("parses disconnect, which takes no arguments", () => {
+    expect(parseArgs(["disconnect"])).toEqual({ command: "disconnect" });
+    expect(() => parseArgs(["disconnect", "contoso"])).toThrow(/no arguments/);
   });
   it("rejects unknown commands", () => {
     expect(() => parseArgs(["frobnicate"])).toThrow(/Unknown command/);

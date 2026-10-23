@@ -1,14 +1,14 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { GraphClient } from "../graph/client.js";
-import { cloudOf, modeOf, type ConnectionStore } from "../connections/store.js";
+import type { ConnectionStore } from "../connections/store.js";
 import { BINDING_TYPES } from "../sandbox/binding-types.js";
 import { makeBinding } from "../sandbox/binding.js";
 import type { RunResult, Sandbox } from "../sandbox/sandbox.js";
 import type { Connection, GraphCallRecord } from "../types.js";
 import { DEFAULT_MAX_CHARS, capJson, shedToFit } from "./output.js";
 
-export const EXECUTE_DESCRIPTION = `Run a JavaScript script against Microsoft Graph for one tenant. Use this for any read, filter, join, count, or change. Write the body of an async function and "return" the value you want back. Only what you return (and console.log) comes back to you, so filter and select inside the script. Output is capped at about 10,000 tokens.
+export const EXECUTE_DESCRIPTION = `Run a JavaScript script against Microsoft Graph in the tenant this server is signed in to. Use this for any read, filter, join, count, or change. Write the body of an async function and "return" the value you want back. Only what you return (and console.log) comes back to you, so filter and select inside the script. Output is capped at about 10,000 tokens.
 
 Rules the server applies for you: v1.0 by default (pass beta: true per call), ConsistencyLevel and $count for advanced directory queries, Retry-After on throttling, and a path Graph cannot find answered with the closest paths the index holds. Paths are Graph-relative like "/users" or "/identity/conditionalAccess/policies", and you pass your own select. Use search to find a path, the properties an entity has, and the scopes a call needs, rather than guessing. graph.request writes; a connection added in read mode refuses every method but GET.
 
@@ -31,7 +31,7 @@ return page.items;
 return await graph.request({ method: "PATCH", path: "/users/{id}", body: { accountEnabled: false } });`;
 
 export interface ExecuteDeps {
-  store: Pick<ConnectionStore, "resolve" | "list">;
+  store: Pick<ConnectionStore, "list">;
   client: GraphClient;
   sandbox: Pick<Sandbox, "run">;
 }
@@ -105,15 +105,14 @@ export function shapeRunOutput(
 }
 
 /**
- * The agent has no tool that lists connections (ADR-0020), so this error is how it finds the right
- * one. It names each alias with its cloud and mode, and never a token, scope or user name.
+ * The one sign-in this install uses. Like Cloudflare's server, an install is signed in to one
+ * tenant, and a second tenant is a second install with its own GRAPHSLAYER_HOME. ADR-0021.
  */
-export function unknownTenantMessage(tenant: string, connections: Connection[]): string {
-  if (!connections.length) {
-    return `No connection named "${tenant}", and none are set up. Ask the person to run \`graphslayer connect --alias <name>\` in a terminal.`;
-  }
-  const rows = connections.map((c) => `- ${c.alias} (${c.tenantName ?? c.tenantId}, ${cloudOf(c)}, ${modeOf(c)})`);
-  return `No connection named "${tenant}". The connections are:\n${rows.join("\n")}\nPass one of these aliases as tenant. Only the person can add one, with \`graphslayer connect\` in a terminal.`;
+export function theConnection(connections: Connection[]): { connection: Connection } | { error: string } {
+  if (connections.length === 1) return { connection: connections[0] };
+  if (!connections.length) return { error: "graphslayer is not signed in to a tenant. Ask the person to run `graphslayer connect` in a terminal." };
+  // Only an install upgraded from a version that held several sign-ins gets here.
+  return { error: `graphslayer holds ${connections.length} sign-ins and uses only one. Ask the person to run \`graphslayer disconnect\` and then \`graphslayer connect\` in a terminal.` };
 }
 
 export function registerExecuteTool(server: McpServer, deps: ExecuteDeps): void {
@@ -123,17 +122,15 @@ export function registerExecuteTool(server: McpServer, deps: ExecuteDeps): void 
       title: "Run a Graph script",
       description: EXECUTE_DESCRIPTION,
       inputSchema: {
-        tenant: z.string().describe("Connection alias or tenant id. If you do not know it, call with any value and the error lists the connections there are."),
         code: z.string().describe("Body of an async JavaScript function. Use await graph.* and return a value."),
       },
       outputSchema,
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },
-    async ({ tenant, code }) => {
-      const connection = await deps.store.resolve(tenant);
-      if (!connection) {
-        return { isError: true, content: [{ type: "text", text: unknownTenantMessage(tenant, await deps.store.list()) }] };
-      }
+    async ({ code }) => {
+      const found = theConnection(await deps.store.list());
+      if ("error" in found) return { isError: true, content: [{ type: "text", text: found.error }] };
+      const { connection } = found;
       const { handle, calls } = makeBinding({ client: deps.client, connection });
       const run = await deps.sandbox.run(code, handle);
       const structured = shapeRunOutput(run, connection.tenantId, calls());

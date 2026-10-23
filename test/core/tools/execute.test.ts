@@ -35,14 +35,9 @@ const appConn: Connection = {
 /** A delegated connection added with the read-write template. */
 const writeConn: Connection = { ...conn, alias: "contoso-write", mode: "write" };
 
-function deps() {
-  const store = {
-    list: async () => [conn, appConn, writeConn],
-    resolve: async (k: string) =>
-      k === "contoso-app" || k === appConn.tenantId ? appConn : k === "contoso" || k === conn.tenantId ? conn : k === "contoso-write" ? writeConn : undefined,
-    upsert: async () => {},
-    remove: async () => false,
-  };
+/** An install holds one sign-in. ADR-0021. */
+function deps(signedIn: Connection[] = [conn]) {
+  const store = { list: async () => signedIn.slice() };
   const client = {
     get: vi.fn(async (_c: Connection, path: string) => ({ id: path })),
     list: vi.fn(async () => ({ items: [{ displayName: "A" }, { displayName: "B" }] })),
@@ -78,11 +73,11 @@ describe("execute", () => {
   });
 
   it("writes from inside a script on a write connection, and returns what Graph answered (#78)", async () => {
-    const d = deps();
+    const d = deps([writeConn]);
     const mcp = await connect(d);
     const res = await mcp.callTool({
       name: "execute",
-      arguments: { tenant: "contoso-write", code: `
+      arguments: { code: `
         const made = await graph.request({ method: "POST", path: "/groups", body: { displayName: "x" } });
         const gone = await graph.request({ method: "DELETE", path: "/groups/" + made.body.id });
         return { made, gone };` },
@@ -99,7 +94,7 @@ describe("execute", () => {
     const mcp = await connect(d);
     const res = await mcp.callTool({
       name: "execute",
-      arguments: { tenant: "contoso", code: `await graph.request({ method: "PATCH", path: "/groups/1", body: {} }); return "wrote";` },
+      arguments: { code: `await graph.request({ method: "PATCH", path: "/groups/1", body: {} }); return "wrote";` },
     });
     const sc = res.structuredContent as { ok: boolean; error?: { message: string } };
 
@@ -113,7 +108,7 @@ describe("execute", () => {
     const mcp = await connect(d);
     const res = await mcp.callTool({
       name: "execute",
-      arguments: { tenant: "contoso", code: "const p = await graph.list('/users'); return p.items.map(u => u.displayName);" },
+      arguments: { code: "const p = await graph.list('/users'); return p.items.map(u => u.displayName);" },
     });
     const sc = res.structuredContent as { ok: boolean; result: unknown; calls: Array<{ path: string }>; tenant: string; truncated: boolean };
     expect(sc.ok).toBe(true);
@@ -140,7 +135,6 @@ describe("execute", () => {
     const res = await mcp.callTool({
       name: "execute",
       arguments: {
-        tenant: "contoso",
         code: "const p = await graph.list('/me/memberOf', { filter: \"startsWith(displayName,'a')\" }); return p.items.length;",
       },
     });
@@ -150,19 +144,31 @@ describe("execute", () => {
     expect(sent[0].headers["consistencylevel"]).toBe("eventual");
   });
 
-  it("returns an error result for an unknown tenant", async () => {
-    const mcp = await connect(deps());
-    const res = await mcp.callTool({ name: "execute", arguments: { tenant: "nope", code: "return 1;" } });
+  it("has no tenant argument, like Cloudflare's execute (ADR-0021)", async () => {
+    const tools = (await (await connect(deps())).listTools()).tools;
+    const props = (tools.find((t) => t.name === "execute")?.inputSchema as { properties: Record<string, unknown> }).properties;
+    expect(Object.keys(props)).toEqual(["code"]);
+  });
+
+  it("tells the agent to ask for a sign-in when there is none", async () => {
+    const mcp = await connect(deps([]));
+    const res = await mcp.callTool({ name: "execute", arguments: { code: "return 1;" } });
     expect(res.isError).toBe(true);
-    const text = (res.content as Array<{ text: string }>)[0].text;
-    expect(text).toContain('No connection named "nope"');
-    expect(text).toContain("- contoso (");
-    expect(text).not.toContain("connections_list");
+    expect((res.content as Array<{ text: string }>)[0].text).toContain("graphslayer connect");
+  });
+
+  it("refuses to guess when an older install still holds several sign-ins", async () => {
+    const d = deps([conn, appConn]);
+    const mcp = await connect(d);
+    const res = await mcp.callTool({ name: "execute", arguments: { code: "return 1;" } });
+    expect(res.isError).toBe(true);
+    expect((res.content as Array<{ text: string }>)[0].text).toContain("2 sign-ins");
+    expect(d.client.get).not.toHaveBeenCalled();
   });
 
   it("returns ok false with the script error and logs when the script throws", async () => {
     const mcp = await connect(deps());
-    const res = await mcp.callTool({ name: "execute", arguments: { tenant: "contoso", code: "console.log('before'); throw new Error('boom');" } });
+    const res = await mcp.callTool({ name: "execute", arguments: { code: "console.log('before'); throw new Error('boom');" } });
     const sc = res.structuredContent as { ok: boolean; error?: { message: string; line?: number }; logs: string[] };
     expect(sc.ok).toBe(false);
     expect(sc.error?.message).toContain("boom");

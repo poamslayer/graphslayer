@@ -4,9 +4,9 @@ import { fileURLToPath } from "node:url";
 import type { BrowserSignIn, MsalAuth } from "../core/auth/msal.js";
 import { inheritedScopesReport, SCOPE_NAME_RE, type ScopeTemplate } from "../core/auth/scopes.js";
 import type { Cloud } from "../core/config.js";
-import { removeConnection } from "../core/connections/remove.js";
+import { keepOnlySignIn, removeAllSignIns } from "../core/connections/remove.js";
 import { cloudOf, modeOf, type ConnectionStore } from "../core/connections/store.js";
-import type { ConnectionMode } from "../core/types.js";
+import type { Connection, ConnectionMode } from "../core/types.js";
 import { buildDeps, startStdioServer } from "../transport/stdio/main.js";
 import { promptSecret, type PromptIo } from "./prompt.js";
 
@@ -14,7 +14,7 @@ export type CliArgs =
   | { command: "serve" }
   | { command: "help" }
   | { command: "connections" }
-  | { command: "disconnect"; alias: string }
+  | { command: "disconnect" }
   | { command: "connect"; alias?: string; tenantHint?: string; cloud?: Cloud; scopes?: string[]; template?: ScopeTemplate; headless?: Headless }
   | { command: "connect-app-only"; alias?: string; tenantId: string; clientId: string; mode: ConnectionMode; cloud?: Cloud; certPath?: string }
   | { command: "connect-agent"; alias?: string; tenantId: string; blueprintId: string; agentId: string; mode: ConnectionMode; cloud?: Cloud; certPath?: string; headless?: Headless };
@@ -61,8 +61,8 @@ export function parseArgs(argv: string[]): CliArgs {
   if (cmd === "--help" || cmd === "-h" || cmd === "help") return { command: "help" };
   if (cmd === "connections") return { command: "connections" };
   if (cmd === "disconnect") {
-    if (rest.length !== 1 || rest[0].startsWith("-")) throw new Error("disconnect takes one connection alias or tenant id: graphslayer disconnect <alias>");
-    return { command: "disconnect", alias: rest[0] };
+    if (rest.length) throw new Error("disconnect takes no arguments. It removes this install's sign-in.");
+    return { command: "disconnect" };
   }
   if (cmd === "connect") return parseConnect(rest);
   throw new Error(`Unknown command "${cmd}". Run with --help.`);
@@ -194,7 +194,7 @@ export async function connectAppOnly(
   deps: AppOnlyConnectDeps,
   args: Extract<CliArgs, { command: "connect-app-only" }>,
   io: PromptIo & { stdout?: NodeJS.WritableStream } = {},
-): Promise<void> {
+): Promise<Connection> {
   const stdout = io.stdout ?? process.stdout;
   const credential = await promptSecret(args.certPath ? `Certificate password for ${args.certPath}: ` : "Client secret: ", io);
   const { connection } = await deps.auth.signInAppOnly({
@@ -209,6 +209,7 @@ export async function connectAppOnly(
   await deps.store.upsert(connection);
   // Names what was created and nothing about the credential, not even its length.
   stdout.write(`Connected "${connection.alias}" (${connection.tenantName ?? connection.tenantId}) as app ${connection.clientId}, mode ${modeOf(connection)}\n`);
+  return connection;
 }
 
 /**
@@ -250,7 +251,7 @@ export async function connectAgent(
   deps: AgentConnectDeps,
   args: Extract<CliArgs, { command: "connect-agent" }>,
   io: PromptIo & { stdout?: NodeJS.WritableStream } = {},
-): Promise<void> {
+): Promise<Connection> {
   const stdout = io.stdout ?? process.stdout;
   const credential = await promptSecret(args.certPath ? `Certificate password for ${args.certPath}: ` : "Blueprint client secret: ", io);
   const { connection } = await deps.auth.signInAgent({
@@ -266,6 +267,7 @@ export async function connectAgent(
   });
   await deps.store.upsert(connection);
   stdout.write(`Connected "${connection.alias}" (${connection.tenantName ?? connection.tenantId}) as agent ${connection.agentId} for ${connection.username}, mode ${modeOf(connection)}\n`);
+  return connection;
 }
 
 const HELP = `graphslayer
@@ -304,9 +306,8 @@ const HELP = `graphslayer
       --alias <name>           Short name for the connection
       --no-browser, --port <n>, --device-code
                                As for a delegated connect
-  graphslayer connections     List stored connections: alias, tenant, cloud, kind, mode, user, scopes
-  graphslayer disconnect <alias>
-                               Remove a connection, its cached sign-in and its stored credential
+  graphslayer connections     Show the sign-in: alias, tenant, cloud, kind, mode, user, scopes
+  graphslayer disconnect      Sign out: remove the sign-in, its cached tokens and stored credential
 `;
 
 async function main(argv: string[]): Promise<void> {
@@ -324,23 +325,30 @@ async function main(argv: string[]): Promise<void> {
     return;
   }
   if (args.command === "disconnect") {
-    if (!(await removeConnection(deps, args.alias))) throw new Error(`No connection named "${args.alias}". Run graphslayer connections to see them.`);
-    process.stdout.write(`Removed "${args.alias}"\n`);
+    const removed = await removeAllSignIns(deps);
+    process.stdout.write(removed.length ? `Signed out of ${removed.map((a) => `"${a}"`).join(", ")}\n` : "Not signed in\n");
     return;
   }
   if (args.command === "connect-app-only") {
-    await connectAppOnly(deps, args);
+    await replaced(deps, await connectAppOnly(deps, args));
     return;
   }
   if (args.command === "connect-agent") {
-    await connectAgent(deps, args);
+    await replaced(deps, await connectAgent(deps, args));
     return;
   }
   const { connection } = await deps.auth.signInDelegated({ alias: args.alias, tenantHint: args.tenantHint, cloud: args.cloud, scopes: args.scopes, template: args.template, ...(args.headless ? { browser: headlessBrowser(args.headless) } : {}) });
   await deps.store.upsert(connection);
   process.stdout.write(`Connected "${connection.alias}" (${connection.tenantName ?? connection.tenantId}) as ${connection.username}, mode ${modeOf(connection)}\n`);
+  await replaced(deps, connection);
   const note = inheritedScopesReport(connection)?.inheritedScopesNote;
   if (note) process.stdout.write(`${note}\n`);
+}
+
+/** An install holds one sign-in, so a new one replaces the old. ADR-0021. */
+async function replaced(deps: Awaited<ReturnType<typeof buildDeps>>, connection: Connection): Promise<void> {
+  const removed = await keepOnlySignIn(deps, connection.alias);
+  if (removed.length) process.stdout.write(`Replaced the previous sign-in ${removed.map((a) => `"${a}"`).join(", ")}\n`);
 }
 
 /**
